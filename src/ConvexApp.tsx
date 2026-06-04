@@ -1,0 +1,193 @@
+import { useAction, useMutation, useQuery } from "convex/react";
+import { useEffect, useMemo, useState } from "react";
+import type { AppIdentity } from "./auth/AuthShell";
+import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
+import { downloadText } from "./lib/download";
+import { convexApi } from "./lib/convexRefs";
+import type { ApplicationDetail, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
+
+export function ConvexApp({ identity }: { identity: AppIdentity }) {
+  const rawApplications = useQuery(convexApi.applications.list) ?? [];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const rawDetail = useQuery(convexApi.applications.get, selectedId ? { applicationId: selectedId } : "skip");
+  const [busy, setBusy] = useState(false);
+
+  const createApplication = useMutation(convexApi.applications.create);
+  const saveField = useMutation(convexApi.applications.saveField);
+  const upsertParcel = useMutation(convexApi.applications.upsertParcel);
+  const removeParcel = useMutation(convexApi.applications.removeParcel);
+  const validate = useMutation(convexApi.applications.validate);
+  const submit = useMutation(convexApi.applications.submit);
+  const generateUploadUrl = useMutation(convexApi.files.generateUploadUrl);
+  const attachUploadedFile = useMutation(convexApi.files.attachUploadedFile);
+  const createOcrJob = useMutation(convexApi.ocr.createJob);
+  const runOcrJob = useAction(convexApi.ocr.runJob);
+  const acceptOcr = useMutation(convexApi.ocr.acceptResult);
+  const rejectOcr = useMutation(convexApi.ocr.rejectResult);
+  const generateCsv = useAction(convexApi.export.generateCsv);
+  const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
+
+  const applications = useMemo<AppRecord[]>(
+    () =>
+      rawApplications.map((item: any) => ({
+        id: item._id,
+        title: item.title,
+        year: item.year,
+        status: item.status,
+        updatedAt: item.updatedAt,
+      })),
+    [rawApplications],
+  );
+
+  useEffect(() => {
+    if (!selectedId && applications[0]) setSelectedId(applications[0].id);
+  }, [applications, selectedId]);
+
+  const detail = useMemo<ApplicationDetail | null>(() => {
+    if (!rawDetail) return null;
+    return {
+      application: {
+        id: rawDetail.application._id,
+        title: rawDetail.application.title,
+        year: rawDetail.application.year,
+        status: rawDetail.application.status,
+        updatedAt: rawDetail.application.updatedAt,
+      },
+      values: rawDetail.values.map((item: any) => ({
+        id: item._id,
+        fieldKey: item.fieldKey,
+        value: item.value,
+        source: item.source,
+        confidence: item.confidence,
+        status: item.status,
+      })),
+      parcels: rawDetail.parcels.map((item: any) => ({
+        id: item._id,
+        fieldNo: item.fieldNo,
+        splitNo: item.splitNo,
+        cropSeason: item.cropSeason,
+        location: item.location,
+        landCategory: item.landCategory,
+        mainAreaM2: item.mainAreaM2,
+        cropAreaM2: item.cropAreaM2,
+        cropName: item.cropName,
+        cropType: item.cropType,
+        paymentExcluded: item.paymentExcluded,
+        continuationExcluded: item.continuationExcluded,
+        note: item.note,
+      })),
+      ocrResults: rawDetail.ocrResults.map((item: any) => ({
+        id: item._id,
+        fieldKey: item.fieldKey,
+        label: item.label,
+        value: item.value,
+        confidence: item.confidence,
+        page: item.page,
+        status: item.status,
+      })),
+      issues: rawDetail.issues.map((item: any) => ({
+        id: item._id,
+        fieldKey: item.fieldKey,
+        severity: item.severity,
+        message: item.message,
+      })),
+    };
+  }, [rawDetail]);
+
+  return (
+    <ApplicationWorkspace
+      mode="convex"
+      identity={identity}
+      applications={applications}
+      detail={detail}
+      selectedId={selectedId}
+      busy={busy}
+      lastManualSaveAt={lastManualSaveAt}
+      onSelect={setSelectedId}
+      onManualSave={() => setLastManualSaveAt(Date.now())}
+      onCreate={async () => {
+        const id = await createApplication({
+          year: "2027",
+          title: "令和9年産 交付申請 / 新規",
+          applicantName: identity.displayName,
+        });
+        setSelectedId(id);
+      }}
+      onSaveField={async (fieldKey, value) => {
+        if (!selectedId) return;
+        await saveField({ applicationId: selectedId, fieldKey, value });
+      }}
+      onUpsertParcel={async (parcel: LandParcel) => {
+        if (!selectedId) return;
+        await upsertParcel({
+          applicationId: selectedId,
+          parcelId: parcel.id.startsWith("new-") ? undefined : parcel.id,
+          fieldNo: parcel.fieldNo,
+          splitNo: parcel.splitNo,
+          cropSeason: parcel.cropSeason,
+          location: parcel.location,
+          landCategory: parcel.landCategory,
+          mainAreaM2: parcel.mainAreaM2,
+          cropAreaM2: parcel.cropAreaM2,
+          cropName: parcel.cropName,
+          cropType: parcel.cropType,
+          paymentExcluded: parcel.paymentExcluded,
+          continuationExcluded: parcel.continuationExcluded,
+          note: parcel.note,
+        });
+      }}
+      onRemoveParcel={async (parcelId) => {
+        if (!selectedId) return;
+        await removeParcel({ applicationId: selectedId, parcelId });
+      }}
+      onUploadOcr={async (file: File, provider: OcrProvider, modelId: string) => {
+        if (!selectedId) return;
+        setBusy(true);
+        try {
+          const uploadUrl = await generateUploadUrl();
+          const uploadResult = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": file.type },
+            body: file,
+          });
+          const { storageId } = await uploadResult.json();
+          const uploadedFileId = await attachUploadedFile({
+            applicationId: selectedId,
+            storageId,
+            filename: file.name,
+            contentType: file.type || "application/pdf",
+            kind: "application_pdf",
+          });
+          const jobId = await createOcrJob({
+            applicationId: selectedId,
+            uploadedFileId,
+            provider,
+            modelId,
+          });
+          await runOcrJob({ ocrJobId: jobId });
+        } finally {
+          setBusy(false);
+        }
+      }}
+      onAcceptOcr={async (resultId: string, value: PrimitiveValue) => {
+        await acceptOcr({ resultId, value });
+      }}
+      onRejectOcr={async (resultId: string) => {
+        await rejectOcr({ resultId });
+      }}
+      onValidate={async () => {
+        if (!selectedId) return;
+        await validate({ applicationId: selectedId });
+      }}
+      onSubmit={async () => {
+        if (!selectedId) return;
+        await submit({ applicationId: selectedId });
+      }}
+      onExportCsv={async () => {
+        if (!selectedId) return;
+        const result = await generateCsv({ applicationId: selectedId });
+        downloadText(result.fileName, result.content);
+      }}
+    />
+  );
+}
