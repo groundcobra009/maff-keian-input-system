@@ -89,8 +89,8 @@ export const fieldGroups: FieldGroup[] = [
 ];
 
 export const modelOptions = [
+  { provider: "anthropic", modelId: "claude-sonnet-4-20250514", label: "Claude Sonnet 4（標準）" },
   { provider: "openai", modelId: "gpt-4.1-mini", label: "OpenAI gpt-4.1-mini" },
-  { provider: "anthropic", modelId: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
   { provider: "gemini", modelId: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
 ] as const;
 

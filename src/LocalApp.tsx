@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AppIdentity } from "./auth/AuthShell";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
 import { AdminDashboard } from "./components/AdminDashboard";
+import { ChatApplicationMode } from "./components/ChatApplicationMode";
 import { initialApplications, initialDetail } from "./lib/localSeed";
 import { buildLocalCsv, downloadText } from "./lib/download";
 import type { AdminDashboardData, ApplicationDetail, ApplicationStatus, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
@@ -22,7 +23,7 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   const [details, setDetails] = useState<Record<string, ApplicationDetail>>(restored.details);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState<"input" | "admin">("input");
+  const [view, setView] = useState<AppView>("input");
   const detail = selectedId ? details[selectedId] ?? null : null;
 
   const valueMap = useMemo(() => new Map(detail?.values.map((item) => [item.fieldKey, item.value]) ?? []), [detail]);
@@ -47,6 +48,33 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
 
   const adminData = useMemo(() => buildLocalAdminData(applications, details), [applications, details]);
 
+  const createDraft = () => {
+    const id = crypto.randomUUID();
+    const app: AppRecord = {
+      id,
+      title: `令和9年産 交付申請 / 新規`,
+      year: "2027",
+      status: "draft",
+      updatedAt: Date.now(),
+    };
+    setApplications((current) => [app, ...current]);
+    setDetails((current) => ({
+      ...current,
+      [id]: { application: app, values: [], parcels: [], ocrResults: [], issues: [] },
+    }));
+    setSelectedId(id);
+  };
+
+  const saveFieldValue = (fieldKey: string, value: PrimitiveValue) => {
+    patchDetail((current) => {
+      const exists = current.values.some((item) => item.fieldKey === fieldKey);
+      const values = exists
+        ? current.values.map((item) => (item.fieldKey === fieldKey ? { ...item, value, source: "manual" as const, status: "draft" as const } : item))
+        : [...current.values, { fieldKey, value, source: "manual" as const, status: "draft" as const }];
+      return touch({ ...current, values });
+    });
+  };
+
   return (
     <>
       <ViewSwitcher view={view} onChange={setView} />
@@ -67,6 +95,15 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
             });
           }}
         />
+      ) : view === "chat" ? (
+        <ChatApplicationMode
+          mode="local"
+          identity={identity}
+          detail={detail}
+          selectedId={selectedId}
+          onCreate={createDraft}
+          onSaveField={saveFieldValue}
+        />
       ) : (
     <ApplicationWorkspace
       mode="local"
@@ -78,31 +115,8 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
       lastManualSaveAt={lastManualSaveAt}
       onSelect={setSelectedId}
       onManualSave={manualSave}
-      onCreate={() => {
-        const id = crypto.randomUUID();
-        const app: AppRecord = {
-          id,
-          title: `令和9年産 交付申請 / 新規`,
-          year: "2027",
-          status: "draft",
-          updatedAt: Date.now(),
-        };
-        setApplications((current) => [app, ...current]);
-        setDetails((current) => ({
-          ...current,
-          [id]: { application: app, values: [], parcels: [], ocrResults: [], issues: [] },
-        }));
-        setSelectedId(id);
-      }}
-      onSaveField={(fieldKey, value) => {
-        patchDetail((current) => {
-          const exists = current.values.some((item) => item.fieldKey === fieldKey);
-          const values = exists
-            ? current.values.map((item) => (item.fieldKey === fieldKey ? { ...item, value, source: "manual" as const, status: "draft" as const } : item))
-            : [...current.values, { fieldKey, value, source: "manual" as const, status: "draft" as const }];
-          return touch({ ...current, values });
-        });
-      }}
+      onCreate={createDraft}
+      onSaveField={saveFieldValue}
       onUpsertParcel={(parcel) => {
         patchDetail((current) => {
           const exists = current.parcels.some((item) => item.id === parcel.id);
@@ -273,11 +287,16 @@ function buildLocalAdminData(applications: AppRecord[], details: Record<string, 
   };
 }
 
-function ViewSwitcher({ view, onChange }: { view: "input" | "admin"; onChange: (view: "input" | "admin") => void }) {
+type AppView = "input" | "chat" | "admin";
+
+function ViewSwitcher({ view, onChange }: { view: AppView; onChange: (view: AppView) => void }) {
   return (
     <div className="view-switcher">
       <button className={view === "input" ? "active" : ""} onClick={() => onChange("input")}>
         申請入力
+      </button>
+      <button className={view === "chat" ? "active" : ""} onClick={() => onChange("chat")}>
+        チャット申請
       </button>
       <button className={view === "admin" ? "active" : ""} onClick={() => onChange("admin")}>
         管理

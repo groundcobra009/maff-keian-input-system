@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AppIdentity } from "./auth/AuthShell";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
+import { ChatApplicationMode } from "./components/ChatApplicationMode";
 import { buildDemoAdminData } from "./lib/demoDashboardData";
 import { downloadText } from "./lib/download";
 import { convexApi } from "./lib/convexRefs";
@@ -30,7 +31,7 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   const generateCsv = useAction(convexApi.export.generateCsv);
   const setApplicationStatus = useMutation(convexApi.admin.setApplicationStatus);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
-  const [view, setView] = useState<"input" | "admin">("input");
+  const [view, setView] = useState<AppView>("input");
   const demoAdminData = useMemo(() => buildDemoAdminData(30), []);
   const adminData = useMemo(() => {
     const data = rawAdminData as AdminDashboardData | undefined;
@@ -105,6 +106,20 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
     };
   }, [rawDetail]);
 
+  const createDraft = async () => {
+    const id = await createApplication({
+      year: "2027",
+      title: "令和9年産 交付申請 / 新規",
+      applicantName: identity.displayName,
+    });
+    setSelectedId(id);
+  };
+
+  const saveFieldValue = async (fieldKey: string, value: PrimitiveValue) => {
+    if (!selectedId) return;
+    await saveField({ applicationId: selectedId, fieldKey, value });
+  };
+
   return (
     <>
       <ViewSwitcher view={view} onChange={setView} />
@@ -119,6 +134,15 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
             await setApplicationStatus({ applicationId, status, actor: identity.email ?? identity.displayName });
           }}
         />
+      ) : view === "chat" ? (
+        <ChatApplicationMode
+          mode="convex"
+          identity={identity}
+          detail={detail}
+          selectedId={selectedId}
+          onCreate={createDraft}
+          onSaveField={saveFieldValue}
+        />
       ) : (
     <ApplicationWorkspace
       mode="convex"
@@ -130,18 +154,8 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
       lastManualSaveAt={lastManualSaveAt}
       onSelect={setSelectedId}
       onManualSave={() => setLastManualSaveAt(Date.now())}
-      onCreate={async () => {
-        const id = await createApplication({
-          year: "2027",
-          title: "令和9年産 交付申請 / 新規",
-          applicantName: identity.displayName,
-        });
-        setSelectedId(id);
-      }}
-      onSaveField={async (fieldKey, value) => {
-        if (!selectedId) return;
-        await saveField({ applicationId: selectedId, fieldKey, value });
-      }}
+      onCreate={createDraft}
+      onSaveField={saveFieldValue}
       onUpsertParcel={async (parcel: LandParcel) => {
         if (!selectedId) return;
         await upsertParcel({
@@ -219,11 +233,16 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   );
 }
 
-function ViewSwitcher({ view, onChange }: { view: "input" | "admin"; onChange: (view: "input" | "admin") => void }) {
+type AppView = "input" | "chat" | "admin";
+
+function ViewSwitcher({ view, onChange }: { view: AppView; onChange: (view: AppView) => void }) {
   return (
     <div className="view-switcher">
       <button className={view === "input" ? "active" : ""} onClick={() => onChange("input")}>
         申請入力
+      </button>
+      <button className={view === "chat" ? "active" : ""} onClick={() => onChange("chat")}>
+        チャット申請
       </button>
       <button className={view === "admin" ? "active" : ""} onClick={() => onChange("admin")}>
         管理
