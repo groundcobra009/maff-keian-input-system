@@ -835,7 +835,21 @@ textarea {
   min-height: 70px;
 }
 
-.chat-composer button {
+.chat-choice-list {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-choice-list button {
+  min-width: 136px;
+  justify-content: flex-start;
+}
+
+.chat-composer > .primary-button {
+  grid-column: 2;
+  grid-row: 1;
   align-self: end;
   min-width: 112px;
 }

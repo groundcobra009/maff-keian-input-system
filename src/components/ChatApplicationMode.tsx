@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { AppIdentity } from "../auth/AuthShell";
 import { fieldGroups, statusLabels } from "../data/formDefinition";
 import type { ApplicationDetail, PrimitiveValue } from "../types";
+import type { FieldDefinition } from "../types";
 
 type ChatRole = "assistant" | "user";
 
@@ -18,6 +19,12 @@ type DraftField = {
   label: string;
   value: PrimitiveValue;
   confidence?: number;
+};
+
+type DirectFieldSave = {
+  fieldKey: string;
+  label: string;
+  value: PrimitiveValue;
 };
 
 type Props = {
@@ -45,25 +52,36 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [lastSavedFields, setLastSavedFields] = useState<DraftField[]>([]);
+  const [nextFieldKey, setNextFieldKey] = useState<string | null>("applicant.nameKanji");
 
   const valueMap = useMemo(() => new Map(detail?.values.map((item) => [item.fieldKey, item.value]) ?? []), [detail]);
   const filledCount = detail?.values.length ?? 0;
   const requiredCount = allFields.filter((field) => field.required).length;
   const requiredFilledCount = allFields.filter((field) => field.required && valueMap.has(field.key)).length;
   const visibleValues = allFields.filter((field) => valueMap.has(field.key)).slice(0, 12);
+  const nextField = allFields.find((field) => field.key === nextFieldKey);
+  const choiceField = nextField?.type === "select" && nextField.options?.length ? nextField : null;
 
-  const sendToAssistant = async (text: string) => {
+  const sendToAssistant = async (text: string, directSave?: DirectFieldSave) => {
     if (!detail || busy) return;
     const trimmed = text.trim();
     if (!trimmed) return;
 
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", text: trimmed };
     const nextMessages = [...messages, userMessage];
+    const currentFields = allFields
+      .filter((field) => valueMap.has(field.key))
+      .map((field) => ({ fieldKey: field.key, label: field.label, value: valueMap.get(field.key) }));
+    const requestFields = directSave
+      ? [...currentFields.filter((field) => field.fieldKey !== directSave.fieldKey), directSave]
+      : currentFields;
+
     setMessages(nextMessages);
     setInput("");
     setBusy(true);
 
     try {
+      if (directSave) await onSaveField(directSave.fieldKey, directSave.value);
       const response = await fetch("/api/application-chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -74,9 +92,7 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
             email: identity.email,
             authMode: identity.authMode,
           },
-          currentFields: allFields
-            .filter((field) => valueMap.has(field.key))
-            .map((field) => ({ fieldKey: field.key, label: field.label, value: valueMap.get(field.key) })),
+          currentFields: requestFields,
           messages: nextMessages.map((message) => ({ role: message.role, text: message.text })),
         }),
       });
@@ -85,14 +101,16 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
       for (const field of fields) {
         await onSaveField(field.fieldKey, field.value);
       }
-      setLastSavedFields(fields);
+      const savedFields = directSave ? [directSave, ...fields.filter((field) => field.fieldKey !== directSave.fieldKey)] : fields;
+      setLastSavedFields(savedFields);
+      setNextFieldKey(typeof result.nextFieldKey === "string" ? result.nextFieldKey : nextUnfilledFieldKey(requestFields, savedFields));
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
           text: typeof result.reply === "string" && result.reply ? result.reply : fallbackQuestion(valueMap),
-          savedCount: fields.length,
+          savedCount: savedFields.length,
         },
       ]);
     } catch {
@@ -107,6 +125,31 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
     } finally {
       setBusy(false);
     }
+  };
+
+  const submitFreeText = () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    const selectedChoice = choiceField ? choiceFromInput(trimmed, choiceField) : null;
+    if (choiceField && selectedChoice) {
+      void sendToAssistant(selectedChoice.text, {
+        fieldKey: choiceField.key,
+        label: choiceField.label,
+        value: selectedChoice.value,
+      });
+      return;
+    }
+    void sendToAssistant(trimmed);
+  };
+
+  const submitChoice = (field: FieldDefinition, optionIndex: number) => {
+    const option = field.options?.[optionIndex];
+    if (!option) return;
+    void sendToAssistant(choiceText(option.label, optionIndex), {
+      fieldKey: field.key,
+      label: field.label,
+      value: option.value,
+    });
   };
 
   const createDraft = async () => {
@@ -183,16 +226,31 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
                 className="chat-composer"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void sendToAssistant(input);
+                  submitFreeText();
                 }}
               >
                 <textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      submitFreeText();
+                    }
+                  }}
                   placeholder="回答を入力"
                   rows={3}
                   disabled={busy}
                 />
+                {choiceField ? (
+                  <div className="chat-choice-list" aria-label={`${choiceField.label}の選択肢`}>
+                    {choiceField.options?.map((option, index) => (
+                      <button key={option.value} type="button" className="ghost-button" disabled={busy} onClick={() => submitChoice(choiceField, index)}>
+                        {choiceText(option.label, index)}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <button className="primary-button" type="submit" disabled={busy || !input.trim()}>
                   <Send size={18} />
                   送信
@@ -262,6 +320,26 @@ function normalizeDraftFields(fields: unknown): DraftField[] {
 function fallbackQuestion(valueMap: Map<string, PrimitiveValue>) {
   const next = allFields.find((field) => field.required && !valueMap.has(field.key)) ?? allFields.find((field) => !valueMap.has(field.key));
   return next ? `${next.label}を教えてください。` : "主要項目は埋まりました。追加で伝えたい内容があれば教えてください。";
+}
+
+function nextUnfilledFieldKey(currentFields: Array<{ fieldKey: string }>, savedFields: Array<{ fieldKey: string }>) {
+  const filledKeys = new Set([...currentFields.map((field) => field.fieldKey), ...savedFields.map((field) => field.fieldKey)]);
+  return allFields.find((field) => field.required && !filledKeys.has(field.key))?.key ?? allFields.find((field) => !filledKeys.has(field.key))?.key ?? null;
+}
+
+function choiceText(label: string, index: number) {
+  return `${index + 1} ${label.replace("あり / ", "").replace("なし / ", "")}`;
+}
+
+function choiceFromInput(input: string, field: FieldDefinition) {
+  const numericChoice = Number(input.replace(/[^\d]/g, ""));
+  const index = Number.isInteger(numericChoice) ? numericChoice - 1 : -1;
+  const option = field.options?.[index];
+  if (!option) return null;
+  return {
+    text: choiceText(option.label, index),
+    value: option.value,
+  };
 }
 
 function formatPrimitive(value: PrimitiveValue | undefined) {
