@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AppIdentity } from "./auth/AuthShell";
+import { isAdminIdentity } from "./auth/permissions";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { ChatApplicationMode } from "./components/ChatApplicationMode";
@@ -36,6 +37,7 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<AppView>("input");
+  const canUseAdmin = isAdminIdentity(identity);
   const detail = selectedId ? details[selectedId] ?? null : null;
 
   const valueMap = useMemo(() => new Map(detail?.values.map((item) => [item.fieldKey, item.value]) ?? []), [detail]);
@@ -52,6 +54,10 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   useEffect(() => {
     writeLocalDrafts({ applications, selectedId, details, councilSettings, adminUsers });
   }, [adminUsers, applications, councilSettings, selectedId, details]);
+
+  useEffect(() => {
+    if (!canUseAdmin && view === "admin") setView("input");
+  }, [canUseAdmin, view]);
 
   const manualSave = () => {
     writeLocalDrafts({ applications, selectedId, details, councilSettings, adminUsers });
@@ -89,8 +95,8 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
 
   return (
     <>
-      <ViewSwitcher view={view} onChange={setView} />
-      {view === "admin" ? (
+      <ViewSwitcher view={view} canUseAdmin={canUseAdmin} onChange={setView} />
+      {view === "admin" && canUseAdmin ? (
         <AdminDashboard
           mode="local"
           identity={identity}
@@ -355,7 +361,7 @@ function buildLocalAdminData(
 
 type AppView = "input" | "chat" | "admin";
 
-function ViewSwitcher({ view, onChange }: { view: AppView; onChange: (view: AppView) => void }) {
+function ViewSwitcher({ view, canUseAdmin, onChange }: { view: AppView; canUseAdmin: boolean; onChange: (view: AppView) => void }) {
   return (
     <div className="view-switcher">
       <button className={view === "input" ? "active" : ""} onClick={() => onChange("input")}>
@@ -364,9 +370,11 @@ function ViewSwitcher({ view, onChange }: { view: AppView; onChange: (view: AppV
       <button className={view === "chat" ? "active" : ""} onClick={() => onChange("chat")}>
         チャット申請
       </button>
-      <button className={view === "admin" ? "active" : ""} onClick={() => onChange("admin")}>
-        管理
-      </button>
+      {canUseAdmin ? (
+        <button className={view === "admin" ? "active" : ""} onClick={() => onChange("admin")}>
+          管理
+        </button>
+      ) : null}
     </div>
   );
 }

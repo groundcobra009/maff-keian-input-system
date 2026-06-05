@@ -19,6 +19,7 @@ const workosClientId = import.meta.env.VITE_WORKOS_CLIENT_ID as string | undefin
 const workosApiHostname = import.meta.env.VITE_WORKOS_API_HOSTNAME as string | undefined;
 const workosDevMode = import.meta.env.VITE_WORKOS_DEV_MODE !== "false";
 const workosRedirectUri = import.meta.env.VITE_WORKOS_REDIRECT_URI || window.location.origin;
+const testModeStorageKey = "maff-keian-auth-test-mode";
 
 export function AuthShell({ children }: AuthShellProps) {
   if (authMode !== "workos") {
@@ -49,11 +50,21 @@ export function AuthShell({ children }: AuthShellProps) {
 }
 
 function TestAuth({ children }: AuthShellProps) {
+  const endTestMode = () => {
+    window.localStorage.removeItem(testModeStorageKey);
+    window.location.reload();
+  };
   return (
     <>
       <div className="auth-banner test">
         <ShieldCheck size={18} />
         <span>テストモード: ログインなしで下書き保存できます</span>
+        {authMode === "workos" ? (
+          <button className="text-button" type="button" onClick={endTestMode}>
+            <LogOut size={16} />
+            テスト終了
+          </button>
+        ) : null}
       </div>
       {children({
         userId: "test-user",
@@ -67,12 +78,13 @@ function TestAuth({ children }: AuthShellProps) {
 function WorkosAuth({ children }: AuthShellProps) {
   const { isLoading, user, signIn, signUp, signOut } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
-  const [useTestMode, setUseTestMode] = useState(false);
+  const [useTestMode, setUseTestMode] = useState(() => window.localStorage.getItem(testModeStorageKey) === "1");
   const [passwordIdentity, setPasswordIdentity] = useState<AppIdentity | null>(null);
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
+    if (useTestMode) return;
     if (window.location.pathname === "/login") {
       signIn().catch((error) => {
         setAuthError(error instanceof Error ? error.message : "ログインを開始できませんでした");
@@ -83,7 +95,7 @@ function WorkosAuth({ children }: AuthShellProps) {
         setAuthError(error instanceof Error ? error.message : "新規登録を開始できませんでした");
       });
     }
-  }, [signIn, signUp]);
+  }, [signIn, signUp, useTestMode]);
 
   if (useTestMode) {
     return <TestAuth>{children}</TestAuth>;
@@ -152,6 +164,7 @@ function WorkosAuth({ children }: AuthShellProps) {
             </button>
           </form>
           <button
+            type="button"
             className="ghost-button"
             onClick={() =>
               signUp().catch((error) => {
@@ -163,6 +176,7 @@ function WorkosAuth({ children }: AuthShellProps) {
             Googleで新規登録
           </button>
           <button
+            type="button"
             className="ghost-button"
             onClick={() =>
               signIn().catch((error) => {
@@ -174,7 +188,16 @@ function WorkosAuth({ children }: AuthShellProps) {
             登録済みの方はこちら
           </button>
           {workosDevMode ? (
-            <button className="ghost-button" onClick={() => setUseTestMode(true)}>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                window.localStorage.setItem(testModeStorageKey, "1");
+                setAuthError(null);
+                setUseTestMode(true);
+                window.history.replaceState({}, document.title, window.location.origin);
+              }}
+            >
               <ShieldCheck size={18} />
               ログインなしでテスト利用
             </button>

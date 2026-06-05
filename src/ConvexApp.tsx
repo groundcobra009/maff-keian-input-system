@@ -1,6 +1,7 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 import type { AppIdentity } from "./auth/AuthShell";
+import { isAdminIdentity } from "./auth/permissions";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
 import { ChatApplicationMode } from "./components/ChatApplicationMode";
@@ -10,8 +11,9 @@ import { convexApi } from "./lib/convexRefs";
 import type { AdminDashboardData, ApplicationDetail, ApplicationStatus, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
 
 export function ConvexApp({ identity }: { identity: AppIdentity }) {
+  const canUseAdmin = isAdminIdentity(identity);
   const rawApplications = useQuery(convexApi.applications.list) ?? [];
-  const rawAdminData = useQuery(convexApi.admin.dashboard);
+  const rawAdminData = useQuery(convexApi.admin.dashboard, canUseAdmin ? {} : "skip");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedConvexId = selectedId && !selectedId.startsWith("optimistic-") ? selectedId : null;
   const rawDetail = useQuery(convexApi.applications.get, selectedConvexId ? { applicationId: selectedConvexId } : "skip");
@@ -63,6 +65,10 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   useEffect(() => {
     if (rawDetail && optimisticDetail) setOptimisticDetail(null);
   }, [optimisticDetail, rawDetail]);
+
+  useEffect(() => {
+    if (!canUseAdmin && view === "admin") setView("input");
+  }, [canUseAdmin, view]);
 
   const detail = useMemo<ApplicationDetail | null>(() => {
     if (!rawDetail) return optimisticDetail;
@@ -167,8 +173,8 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
 
   return (
     <>
-      <ViewSwitcher view={view} onChange={setView} />
-      {view === "admin" ? (
+      <ViewSwitcher view={view} canUseAdmin={canUseAdmin} onChange={setView} />
+      {view === "admin" && canUseAdmin ? (
         <AdminDashboard
           mode="convex"
           identity={identity}
@@ -289,7 +295,7 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
 
 type AppView = "input" | "chat" | "admin";
 
-function ViewSwitcher({ view, onChange }: { view: AppView; onChange: (view: AppView) => void }) {
+function ViewSwitcher({ view, canUseAdmin, onChange }: { view: AppView; canUseAdmin: boolean; onChange: (view: AppView) => void }) {
   return (
     <div className="view-switcher">
       <button className={view === "input" ? "active" : ""} onClick={() => onChange("input")}>
@@ -298,9 +304,11 @@ function ViewSwitcher({ view, onChange }: { view: AppView; onChange: (view: AppV
       <button className={view === "chat" ? "active" : ""} onClick={() => onChange("chat")}>
         チャット申請
       </button>
-      <button className={view === "admin" ? "active" : ""} onClick={() => onChange("admin")}>
-        管理
-      </button>
+      {canUseAdmin ? (
+        <button className={view === "admin" ? "active" : ""} onClick={() => onChange("admin")}>
+          管理
+        </button>
+      ) : null}
     </div>
   );
 }

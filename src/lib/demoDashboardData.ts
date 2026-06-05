@@ -122,8 +122,15 @@ export function buildDemoAdminData(count = 30): AdminDashboardData {
     adminUsers: [
       {
         id: "demo-admin-1",
-        email: "keian@example.local",
+        email: "nakashima.keitarou@gmail.com",
         role: "owner",
+        addedAt: baseTime,
+        addedBy: "demo",
+      },
+      {
+        id: "demo-admin-2",
+        email: "keian",
+        role: "admin",
         addedAt: baseTime,
         addedBy: "demo",
       },
