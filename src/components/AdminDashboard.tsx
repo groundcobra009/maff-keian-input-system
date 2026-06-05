@@ -9,6 +9,8 @@ type Props = {
   mode: "local" | "convex";
   identity: AppIdentity;
   data: AdminDashboardData;
+  notice?: string;
+  statusReadOnly?: boolean;
   onStatusChange: (applicationId: string, status: ApplicationStatus) => Promise<void> | void;
 };
 
@@ -24,7 +26,7 @@ const statusOptions: ApplicationStatus[] = [
   "withdrawn",
 ];
 
-export function AdminDashboard({ mode, identity, data, onStatusChange }: Props) {
+export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, onStatusChange }: Props) {
   const [search, setSearch] = useState("");
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -71,6 +73,7 @@ export function AdminDashboard({ mode, identity, data, onStatusChange }: Props) 
             <div>
               <h2>申請管理</h2>
               <p>申請の状態、検証、OCR、CSV出力状況を確認できます。</p>
+              {notice ? <p className="admin-notice">{notice}</p> : null}
             </div>
             <label className="admin-search">
               <Search size={16} />
@@ -92,7 +95,11 @@ export function AdminDashboard({ mode, identity, data, onStatusChange }: Props) 
               <div key={application.id} className="admin-table-row">
                 <strong>{application.title}</strong>
                 <span>{application.year}</span>
-                <select value={application.status} onChange={(event) => onStatusChange(application.id, event.target.value as ApplicationStatus)}>
+                <select
+                  value={application.status}
+                  disabled={statusReadOnly}
+                  onChange={(event) => onStatusChange(application.id, event.target.value as ApplicationStatus)}
+                >
                   {statusOptions.map((status) => (
                     <option key={status} value={status}>
                       {statusLabels[status]}

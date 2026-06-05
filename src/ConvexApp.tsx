@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AppIdentity } from "./auth/AuthShell";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
+import { buildDemoAdminData } from "./lib/demoDashboardData";
 import { downloadText } from "./lib/download";
 import { convexApi } from "./lib/convexRefs";
 import type { AdminDashboardData, ApplicationDetail, ApplicationStatus, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
@@ -30,6 +31,12 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   const setApplicationStatus = useMutation(convexApi.admin.setApplicationStatus);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
   const [view, setView] = useState<"input" | "admin">("input");
+  const demoAdminData = useMemo(() => buildDemoAdminData(30), []);
+  const adminData = useMemo(() => {
+    const data = rawAdminData as AdminDashboardData | undefined;
+    return data?.applications?.length ? data : demoAdminData;
+  }, [demoAdminData, rawAdminData]);
+  const usingDemoAdminData = !rawAdminData || !(rawAdminData as AdminDashboardData).applications?.length;
 
   const applications = useMemo<AppRecord[]>(
     () =>
@@ -105,7 +112,9 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
         <AdminDashboard
           mode="convex"
           identity={identity}
-          data={(rawAdminData ?? emptyAdminData()) as AdminDashboardData}
+          data={adminData}
+          notice={usingDemoAdminData ? "ダミーデータ30件を表示中です。Convex DBに実データが入ると実データ表示に切り替わります。" : undefined}
+          statusReadOnly={usingDemoAdminData}
           onStatusChange={async (applicationId: string, status: ApplicationStatus) => {
             await setApplicationStatus({ applicationId, status, actor: identity.email ?? identity.displayName });
           }}
@@ -208,18 +217,6 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
       )}
     </>
   );
-}
-
-function emptyAdminData(): AdminDashboardData {
-  return {
-    generatedAt: Date.now(),
-    statusCounts: {},
-    ocrCounts: {},
-    exportCounts: {},
-    issueCounts: { errors: 0, warnings: 0 },
-    applications: [],
-    recentAuditLogs: [],
-  };
 }
 
 function ViewSwitcher({ view, onChange }: { view: "input" | "admin"; onChange: (view: "input" | "admin") => void }) {

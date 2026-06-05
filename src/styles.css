@@ -793,6 +793,11 @@ button:focus-visible {
   font-size: 12px;
 }
 
+.admin-section-heading .admin-notice {
+  color: var(--amber);
+  font-weight: 700;
+}
+
 .admin-search {
   width: min(100%, 340px);
   display: flex;
