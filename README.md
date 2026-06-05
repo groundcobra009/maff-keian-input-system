@@ -15,6 +15,7 @@ React/Vite + Convex で作る、経営所得安定対策等の申請入力シス
 - CSV出力
 - IF仕様から抽出した `public/field_catalog.csv` の参照
 - WorkOS AuthKitによるGoogle認証
+- デモ用ID/パスワード認証（ID: `keian` / パスワード: `keian`）
 - テストモードでのログインなし利用
 - ローカル確認モードでのlocalStorage途中保存
 - 管理画面での申請ステータス、検証、OCR、CSV出力状況の確認
