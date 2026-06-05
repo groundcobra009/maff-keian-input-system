@@ -171,6 +171,13 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
       return;
     }
     if (nextField && nextField.type !== "select") {
+      if (nextField.key === "applicant.address" && isIncompleteAddress(trimmed)) {
+        askCurrentFieldAgain(
+          trimmed,
+          "住所が途中までの可能性があります。市区町村に加えて、町名・番地・建物名まで分かる範囲で教えてください。",
+        );
+        return;
+      }
       void sendToAssistant(trimmed, {
         fieldKey: nextField.key,
         label: nextField.label,
@@ -208,6 +215,19 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
         text: nextKey
           ? `分からない項目は空欄のまま進めます。${questionForFieldKey(nextKey)}`
           : "分からない項目は空欄のままにしました。主要項目は一通り確認しました。",
+      },
+    ]);
+  };
+
+  const askCurrentFieldAgain = (text: string, assistantText: string) => {
+    setInput("");
+    setMessages((current) => [
+      ...current,
+      { id: crypto.randomUUID(), role: "user", text },
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        text: assistantText,
       },
     ]);
   };
@@ -312,7 +332,7 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
+                    if (event.key === "Enter" && event.shiftKey) {
                       event.preventDefault();
                       submitFreeText();
                     }
@@ -419,6 +439,15 @@ function coerceDirectAnswer(value: string, field: FieldDefinition): PrimitiveVal
   if (field.type !== "number") return value;
   const numeric = Number(value.replace(/,/g, ""));
   return Number.isFinite(numeric) ? numeric : value;
+}
+
+function isIncompleteAddress(value: string) {
+  const normalized = value.replace(/\s/g, "");
+  if (normalized.length < 5) return true;
+  if (/^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ーヶ]+(都|道|府|県|市|区|町|村)$/u.test(normalized)) return true;
+  const hasStreetNumber = /(\d|[０-９]|丁目|番地|番|号|-|－|ー|の)/.test(normalized);
+  const hasLotHint = /(大字|字|地割|地内|無番地)/.test(normalized);
+  return !hasStreetNumber && !hasLotHint;
 }
 
 function choiceText(label: string, index: number) {
