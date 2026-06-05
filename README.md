@@ -40,6 +40,7 @@ cp .env.local.example .env.local
 | `VITE_WORKOS_CLIENT_ID` | WorkOS AuthKitのClient ID |
 | `VITE_WORKOS_API_HOSTNAME` | カスタム認証ドメイン。未設定時はdevModeを使う |
 | `VITE_WORKOS_DEV_MODE` | `true` ならクライアント専用開発モード |
+| `VITE_WORKOS_REDIRECT_URI` | WorkOSから戻るURL。例: `https://maff-keian.vercel.app` |
 | `VITE_CONVEX_URL` | ConvexデプロイURL |
 
 ## Convex接続
@@ -83,6 +84,7 @@ Vercelでは以下を設定します。
 VITE_AUTH_MODE=workos
 VITE_WORKOS_CLIENT_ID=client_xxx
 VITE_WORKOS_DEV_MODE=true
+VITE_WORKOS_REDIRECT_URI=https://maff-keian.vercel.app
 VITE_CONVEX_URL=https://your-deployment.convex.cloud
 ```
 

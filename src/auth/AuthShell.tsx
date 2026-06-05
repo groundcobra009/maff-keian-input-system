@@ -1,5 +1,6 @@
 import { AuthKitProvider, useAuth } from "@workos-inc/authkit-react";
 import { LogIn, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 export type AppIdentity = {
@@ -17,6 +18,7 @@ const authMode = (import.meta.env.VITE_AUTH_MODE ?? "test") as "test" | "workos"
 const workosClientId = import.meta.env.VITE_WORKOS_CLIENT_ID as string | undefined;
 const workosApiHostname = import.meta.env.VITE_WORKOS_API_HOSTNAME as string | undefined;
 const workosDevMode = import.meta.env.VITE_WORKOS_DEV_MODE !== "false";
+const workosRedirectUri = import.meta.env.VITE_WORKOS_REDIRECT_URI || window.location.origin;
 
 export function AuthShell({ children }: AuthShellProps) {
   if (authMode !== "workos") {
@@ -32,7 +34,15 @@ export function AuthShell({ children }: AuthShellProps) {
   }
 
   return (
-    <AuthKitProvider clientId={workosClientId} apiHostname={workosApiHostname} devMode={workosDevMode}>
+    <AuthKitProvider
+      clientId={workosClientId}
+      apiHostname={workosApiHostname}
+      devMode={workosDevMode}
+      redirectUri={workosRedirectUri}
+      onRedirectCallback={() => {
+        window.history.replaceState({}, document.title, window.location.origin);
+      }}
+    >
       <WorkosAuth>{children}</WorkosAuth>
     </AuthKitProvider>
   );
@@ -56,6 +66,15 @@ function TestAuth({ children }: AuthShellProps) {
 
 function WorkosAuth({ children }: AuthShellProps) {
   const { isLoading, user, signIn, signOut } = useAuth();
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (window.location.pathname === "/login") {
+      signIn().catch((error) => {
+        setAuthError(error instanceof Error ? error.message : "ログインを開始できませんでした");
+      });
+    }
+  }, [signIn]);
 
   if (isLoading) {
     return (
@@ -76,7 +95,15 @@ function WorkosAuth({ children }: AuthShellProps) {
           <p className="eyebrow">WorkOS AuthKit</p>
           <h1>経営安定申請入力システム</h1>
           <p>Google認証を含むWorkOSのログイン画面から利用を開始します。</p>
-          <button className="primary-button" onClick={() => signIn()}>
+          {authError ? <p className="auth-error">{authError}</p> : null}
+          <button
+            className="primary-button"
+            onClick={() =>
+              signIn().catch((error) => {
+                setAuthError(error instanceof Error ? error.message : "ログインを開始できませんでした");
+              })
+            }
+          >
             <LogIn size={18} />
             Google / WorkOSでログイン
           </button>
