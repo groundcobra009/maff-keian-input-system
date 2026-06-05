@@ -13,6 +13,15 @@ const applicationStatus = v.union(
   v.literal("withdrawn"),
 );
 
+const subsidyPrograms = [
+  { fieldKey: "application.applyWaterDirectPayment", label: "水田活用の直接支払交付金" },
+  { fieldKey: "application.applyNewMarketRice", label: "コメ新市場開拓等促進事業" },
+  { fieldKey: "application.applyFieldCropFormation", label: "畑作物産地形成促進事業" },
+  { fieldKey: "application.applyFieldConversion", label: "畑地化促進事業" },
+  { fieldKey: "application.applyGeta", label: "畑作物の直接支払交付金（ゲタ）" },
+  { fieldKey: "application.applyNarashi", label: "収入減少影響緩和交付金（ナラシ）" },
+];
+
 export const dashboard = query({
   args: {},
   handler: async (ctx) => {
@@ -57,6 +66,55 @@ export const dashboard = query({
       exportCounts[job.status] = (exportCounts[job.status] ?? 0) + 1;
     }
 
+    const valueEntries = await Promise.all(
+      applications.map(async (application) => [
+        application._id,
+        await ctx.db
+          .query("applicationValues")
+          .withIndex("by_application", (q) => q.eq("applicationId", application._id))
+          .collect(),
+      ] as const),
+    );
+    const parcelEntries = await Promise.all(
+      applications.map(async (application) => [
+        application._id,
+        await ctx.db
+          .query("landParcels")
+          .withIndex("by_application", (q) => q.eq("applicationId", application._id))
+          .collect(),
+      ] as const),
+    );
+    const valuesByApplication = new Map(valueEntries);
+    const parcelsByApplication = new Map(parcelEntries);
+    const areaByApplication = new Map<string, { totalAreaM2: number; cropAreaM2: number }>();
+    const subsidyProgramsByApplication = new Map<string, string[]>();
+    for (const application of applications) {
+      const parcels = parcelsByApplication.get(application._id) ?? [];
+      const totalAreaM2 = parcels.reduce((sum, parcel) => sum + (parcel.mainAreaM2 ?? 0), 0);
+      const cropAreaM2 = parcels.reduce((sum, parcel) => sum + (parcel.cropAreaM2 ?? 0), 0);
+      areaByApplication.set(application._id, { totalAreaM2, cropAreaM2 });
+
+      const values = valuesByApplication.get(application._id) ?? [];
+      subsidyProgramsByApplication.set(
+        application._id,
+        subsidyPrograms
+          .filter((program) => values.some((value) => value.fieldKey === program.fieldKey && value.value === "1"))
+          .map((program) => program.fieldKey),
+      );
+    }
+    const areaSummary = Array.from(areaByApplication.values()).reduce(
+      (summary, area) => ({
+        totalAreaM2: summary.totalAreaM2 + area.totalAreaM2,
+        cropAreaM2: summary.cropAreaM2 + area.cropAreaM2,
+        applicationCountWithArea: summary.applicationCountWithArea + (area.totalAreaM2 > 0 || area.cropAreaM2 > 0 ? 1 : 0),
+      }),
+      { totalAreaM2: 0, cropAreaM2: 0, applicationCountWithArea: 0 },
+    );
+    const subsidyCounts = subsidyPrograms.map((program) => ({
+      ...program,
+      count: Array.from(subsidyProgramsByApplication.values()).filter((programs) => programs.includes(program.fieldKey)).length,
+    }));
+
     return {
       generatedAt: Date.now(),
       statusCounts,
@@ -66,8 +124,11 @@ export const dashboard = query({
         errors: issues.filter((issue) => issue.severity === "error").length,
         warnings: issues.filter((issue) => issue.severity !== "error").length,
       },
+      areaSummary,
+      subsidyCounts,
       applications: applications.map((application) => {
         const issueCount = issueCountByApplication.get(application._id) ?? { errors: 0, warnings: 0 };
+        const area = areaByApplication.get(application._id) ?? { totalAreaM2: 0, cropAreaM2: 0 };
         return {
           id: application._id,
           title: application.title,
@@ -82,6 +143,9 @@ export const dashboard = query({
           warningCount: issueCount.warnings,
           ocrJobCount: ocrCountByApplication.get(application._id) ?? 0,
           exportJobCount: exportCountByApplication.get(application._id) ?? 0,
+          totalAreaM2: area.totalAreaM2,
+          cropAreaM2: area.cropAreaM2,
+          subsidyPrograms: subsidyProgramsByApplication.get(application._id) ?? [],
         };
       }),
       recentAuditLogs: auditLogs.map((log) => ({

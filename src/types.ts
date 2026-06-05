@@ -102,6 +102,9 @@ export type AdminApplicationRow = {
   warningCount: number;
   ocrJobCount: number;
   exportJobCount: number;
+  totalAreaM2?: number;
+  cropAreaM2?: number;
+  subsidyPrograms?: string[];
 };
 
 export type AdminAuditLog = {
@@ -122,6 +125,16 @@ export type AdminDashboardData = {
     errors: number;
     warnings: number;
   };
+  areaSummary?: {
+    totalAreaM2: number;
+    cropAreaM2: number;
+    applicationCountWithArea: number;
+  };
+  subsidyCounts?: Array<{
+    fieldKey: string;
+    label: string;
+    count: number;
+  }>;
   applications: AdminApplicationRow[];
   recentAuditLogs: AdminAuditLog[];
 };

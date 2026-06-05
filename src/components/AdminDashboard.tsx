@@ -1,7 +1,7 @@
 import { Activity, AlertCircle, Clock3, Database, FileCheck2, FileDown, ListChecks, Search, ShieldCheck, ScanText } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { statusLabels } from "../data/formDefinition";
+import { fieldGroups, statusLabels } from "../data/formDefinition";
 import type { AdminDashboardData, ApplicationStatus } from "../types";
 import type { AppIdentity } from "../auth/AuthShell";
 
@@ -25,6 +25,10 @@ const statusOptions: ApplicationStatus[] = [
   "exported",
   "withdrawn",
 ];
+
+const subsidyFields = fieldGroups
+  .find((group) => group.id === "programs")!
+  .fields.map((field) => ({ fieldKey: field.key, label: field.label }));
 
 export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, onStatusChange }: Props) {
   const [search, setSearch] = useState("");
@@ -51,6 +55,17 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
   };
   const ocrTotal = Object.values(data.ocrCounts).reduce((sum, value) => sum + value, 0);
   const exportTotal = Object.values(data.exportCounts).reduce((sum, value) => sum + value, 0);
+  const areaSummary = data.areaSummary ?? {
+    totalAreaM2: data.applications.reduce((sum, application) => sum + (application.totalAreaM2 ?? 0), 0),
+    cropAreaM2: data.applications.reduce((sum, application) => sum + (application.cropAreaM2 ?? 0), 0),
+    applicationCountWithArea: data.applications.filter((application) => (application.totalAreaM2 ?? 0) > 0 || (application.cropAreaM2 ?? 0) > 0).length,
+  };
+  const subsidyCounts = data.subsidyCounts?.length
+    ? data.subsidyCounts
+    : subsidyFields.map((field) => ({
+        ...field,
+        count: data.applications.filter((application) => application.subsidyPrograms?.includes(field.fieldKey)).length,
+      }));
   const recentlyUpdated = data.applications.filter((application) => now - application.updatedAt <= 1000 * 60 * 60 * 2).length;
   const staleDrafts = data.applications.filter(
     (application) => ["draft", "ocr_draft", "needs_review", "returned"].includes(application.status) && now - application.updatedAt >= 1000 * 60 * 60 * 24,
@@ -88,6 +103,49 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
         </section>
 
         <section className="dashboard-grid">
+          <div className="dashboard-card">
+            <div className="dashboard-card-heading">
+              <div>
+                <Activity size={18} />
+                <h2>面積サマリ</h2>
+              </div>
+              <span>{areaSummary.applicationCountWithArea}件</span>
+            </div>
+            <div className="area-summary">
+              <div>
+                <span>総面積</span>
+                <strong>{formatArea(areaSummary.totalAreaM2)}</strong>
+              </div>
+              <div>
+                <span>作付面積</span>
+                <strong>{formatArea(areaSummary.cropAreaM2)}</strong>
+              </div>
+              <div>
+                <span>ha換算</span>
+                <strong>{formatHa(areaSummary.cropAreaM2)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="dashboard-card dashboard-card-wide">
+            <div className="dashboard-card-heading">
+              <div>
+                <FileCheck2 size={18} />
+                <h2>補助金ごとの件数</h2>
+              </div>
+              <span>{subsidyCounts.reduce((sum, item) => sum + item.count, 0)}件</span>
+            </div>
+            <div className="subsidy-list">
+              {subsidyCounts.map((program) => (
+                <div key={program.fieldKey}>
+                  <span>{program.label}</span>
+                  <strong>{program.count}</strong>
+                  <i style={{ width: `${Math.max(4, (program.count / Math.max(total, 1)) * 100)}%` }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="dashboard-card dashboard-card-wide">
             <div className="dashboard-card-heading">
               <div>
@@ -209,6 +267,7 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
             <div className="admin-table-head">
               <span>申請</span>
               <span>年度</span>
+              <span>面積</span>
               <span>状態</span>
               <span>検証</span>
               <span>OCR</span>
@@ -219,6 +278,7 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
               <div key={application.id} className="admin-table-row">
                 <strong>{application.title}</strong>
                 <span>{application.year}</span>
+                <span>{formatArea(application.cropAreaM2 ?? application.totalAreaM2 ?? 0)}</span>
                 <select
                   value={application.status}
                   disabled={statusReadOnly}
@@ -306,6 +366,16 @@ function jobLabel(value: string) {
     failed: "失敗",
   };
   return labels[value] ?? value;
+}
+
+function formatArea(value: number) {
+  if (!value) return "-";
+  return `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value)}㎡`;
+}
+
+function formatHa(value: number) {
+  if (!value) return "-";
+  return `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 2 }).format(value / 10000)}ha`;
 }
 
 function Metric({

@@ -42,6 +42,8 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [lastSavedFields, setLastSavedFields] = useState<DraftField[]>([]);
 
   const valueMap = useMemo(() => new Map(detail?.values.map((item) => [item.fieldKey, item.value]) ?? []), [detail]);
@@ -107,6 +109,19 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
     }
   };
 
+  const createDraft = async () => {
+    if (creating) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      await onCreate();
+    } catch {
+      setCreateError("Convexへの下書き作成に時間がかかっています。一時下書きとして入力を開始できます。");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="chat-application-shell">
       <header className="topbar">
@@ -134,6 +149,7 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
                   <p>
                     必須 {requiredFilledCount}/{requiredCount} 項目 · 保存済み {filledCount} 項目
                   </p>
+                  {selectedId?.startsWith("optimistic-") ? <p className="admin-notice">Convex同期待ちの一時下書きです。</p> : null}
                 </div>
                 <button className="ghost-button" onClick={() => sendToAssistant("次の質問をお願いします。")} disabled={busy}>
                   <BotMessageSquare size={18} />
@@ -187,10 +203,11 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
             <div className="empty-state">
               <BotMessageSquare size={36} />
               <h2>チャットで申請下書きを作成します</h2>
-              <button className="primary-button" onClick={onCreate}>
-                <Plus size={18} />
-                申請下書きを作成
+              <button className="primary-button" onClick={createDraft} disabled={creating}>
+                {creating ? <Loader2 className="spin" size={18} /> : <Plus size={18} />}
+                {creating ? "作成中" : "申請下書きを作成"}
               </button>
+              {createError ? <p className="auth-error">{createError}</p> : null}
             </div>
           )}
         </section>

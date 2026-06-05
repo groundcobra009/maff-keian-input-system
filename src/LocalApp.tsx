@@ -15,6 +15,14 @@ type LocalDraftState = {
 };
 
 const localStorageKey = "maff-keian-local-drafts";
+const subsidyPrograms = [
+  { fieldKey: "application.applyWaterDirectPayment", label: "水田活用の直接支払交付金" },
+  { fieldKey: "application.applyNewMarketRice", label: "コメ新市場開拓等促進事業" },
+  { fieldKey: "application.applyFieldCropFormation", label: "畑作物産地形成促進事業" },
+  { fieldKey: "application.applyFieldConversion", label: "畑地化促進事業" },
+  { fieldKey: "application.applyGeta", label: "畑作物の直接支払交付金（ゲタ）" },
+  { fieldKey: "application.applyNarashi", label: "収入減少影響緩和交付金（ナラシ）" },
+];
 
 export function LocalApp({ identity }: { identity: AppIdentity }) {
   const restored = readLocalDrafts();
@@ -258,6 +266,22 @@ function buildLocalAdminData(applications: AppRecord[], details: Record<string, 
   const statusCounts: Record<string, number> = {};
   for (const application of applications) statusCounts[application.status] = (statusCounts[application.status] ?? 0) + 1;
   const allIssues = Object.values(details).flatMap((detail) => detail.issues);
+  const areaSummary = Object.values(details).reduce(
+    (summary, detail) => {
+      const totalAreaM2 = detail.parcels.reduce((sum, parcel) => sum + (parcel.mainAreaM2 ?? 0), 0);
+      const cropAreaM2 = detail.parcels.reduce((sum, parcel) => sum + (parcel.cropAreaM2 ?? 0), 0);
+      return {
+        totalAreaM2: summary.totalAreaM2 + totalAreaM2,
+        cropAreaM2: summary.cropAreaM2 + cropAreaM2,
+        applicationCountWithArea: summary.applicationCountWithArea + (totalAreaM2 > 0 || cropAreaM2 > 0 ? 1 : 0),
+      };
+    },
+    { totalAreaM2: 0, cropAreaM2: 0, applicationCountWithArea: 0 },
+  );
+  const subsidyCounts = subsidyPrograms.map((program) => ({
+    ...program,
+    count: Object.values(details).filter((detail) => detail.values.some((value) => value.fieldKey === program.fieldKey && value.value === "1")).length,
+  }));
   return {
     generatedAt: Date.now(),
     statusCounts,
@@ -267,8 +291,12 @@ function buildLocalAdminData(applications: AppRecord[], details: Record<string, 
       errors: allIssues.filter((issue) => issue.severity === "error").length,
       warnings: allIssues.filter((issue) => issue.severity !== "error").length,
     },
+    areaSummary,
+    subsidyCounts,
     applications: applications.map((application) => {
       const detail = details[application.id];
+      const totalAreaM2 = detail?.parcels.reduce((sum, parcel) => sum + (parcel.mainAreaM2 ?? 0), 0) ?? 0;
+      const cropAreaM2 = detail?.parcels.reduce((sum, parcel) => sum + (parcel.cropAreaM2 ?? 0), 0) ?? 0;
       return {
         id: application.id,
         title: application.title,
@@ -281,6 +309,11 @@ function buildLocalAdminData(applications: AppRecord[], details: Record<string, 
         warningCount: detail?.issues.filter((issue) => issue.severity !== "error").length ?? 0,
         ocrJobCount: detail?.ocrResults.length ? 1 : 0,
         exportJobCount: application.status === "exported" ? 1 : 0,
+        totalAreaM2,
+        cropAreaM2,
+        subsidyPrograms: subsidyPrograms
+          .filter((program) => detail?.values.some((value) => value.fieldKey === program.fieldKey && value.value === "1"))
+          .map((program) => program.fieldKey),
       };
     }),
     recentAuditLogs: [],

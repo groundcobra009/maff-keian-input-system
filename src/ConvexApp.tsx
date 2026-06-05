@@ -13,8 +13,10 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   const rawApplications = useQuery(convexApi.applications.list) ?? [];
   const rawAdminData = useQuery(convexApi.admin.dashboard);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const rawDetail = useQuery(convexApi.applications.get, selectedId ? { applicationId: selectedId } : "skip");
+  const selectedConvexId = selectedId && !selectedId.startsWith("optimistic-") ? selectedId : null;
+  const rawDetail = useQuery(convexApi.applications.get, selectedConvexId ? { applicationId: selectedConvexId } : "skip");
   const [busy, setBusy] = useState(false);
+  const [optimisticDetail, setOptimisticDetail] = useState<ApplicationDetail | null>(null);
 
   const createApplication = useMutation(convexApi.applications.create);
   const saveField = useMutation(convexApi.applications.saveField);
@@ -55,8 +57,12 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
     if (!selectedId && applications[0]) setSelectedId(applications[0].id);
   }, [applications, selectedId]);
 
+  useEffect(() => {
+    if (rawDetail && optimisticDetail) setOptimisticDetail(null);
+  }, [optimisticDetail, rawDetail]);
+
   const detail = useMemo<ApplicationDetail | null>(() => {
-    if (!rawDetail) return null;
+    if (!rawDetail) return optimisticDetail;
     return {
       application: {
         id: rawDetail.application._id,
@@ -104,9 +110,28 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
         message: item.message,
       })),
     };
-  }, [rawDetail]);
+  }, [optimisticDetail, rawDetail, selectedId]);
 
   const createDraft = async () => {
+    const timestamp = Date.now();
+    const optimisticId = `optimistic-${crypto.randomUUID()}`;
+    const optimisticApplication: AppRecord = {
+      id: optimisticId,
+      year: "2027",
+      title: "令和9年産 交付申請 / 新規",
+      status: "draft",
+      updatedAt: timestamp,
+    };
+    setSelectedId(optimisticId);
+    setOptimisticDetail({
+      application: optimisticApplication,
+      values: identity.displayName
+        ? [{ fieldKey: "applicant.nameKanji", value: identity.displayName, source: "manual", status: "draft" }]
+        : [],
+      parcels: [],
+      ocrResults: [],
+      issues: [],
+    });
     const id = await createApplication({
       year: "2027",
       title: "令和9年産 交付申請 / 新規",
@@ -116,8 +141,25 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   };
 
   const saveFieldValue = async (fieldKey: string, value: PrimitiveValue) => {
+    if (selectedId?.startsWith("optimistic-")) {
+      setOptimisticDetail((current) => {
+        if (!current) return current;
+        const timestamp = Date.now();
+        const exists = current.values.some((item) => item.fieldKey === fieldKey);
+        const values = exists
+          ? current.values.map((item) => (item.fieldKey === fieldKey ? { ...item, value, source: "manual" as const, status: "draft" as const } : item))
+          : [...current.values, { fieldKey, value, source: "manual" as const, status: "draft" as const }];
+        return { ...current, values, application: { ...current.application, updatedAt: timestamp } };
+      });
+      return;
+    }
     if (!selectedId) return;
     await saveField({ applicationId: selectedId, fieldKey, value });
+  };
+
+  const selectApplication = (applicationId: string) => {
+    setOptimisticDetail(null);
+    setSelectedId(applicationId);
   };
 
   return (
@@ -152,7 +194,7 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
       selectedId={selectedId}
       busy={busy}
       lastManualSaveAt={lastManualSaveAt}
-      onSelect={setSelectedId}
+      onSelect={selectApplication}
       onManualSave={() => setLastManualSaveAt(Date.now())}
       onCreate={createDraft}
       onSaveField={saveFieldValue}

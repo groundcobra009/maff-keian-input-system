@@ -768,6 +768,11 @@ textarea {
   color: var(--muted);
 }
 
+.chat-draft-header .admin-notice {
+  color: var(--amber);
+  font-weight: 700;
+}
+
 .chat-thread-large {
   display: grid;
   align-content: start;
@@ -1152,6 +1157,57 @@ textarea {
   font-size: 12px;
 }
 
+.area-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.area-summary div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f6f5f1;
+}
+
+.area-summary span,
+.subsidy-list span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.area-summary strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.subsidy-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.subsidy-list div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 8px;
+  align-items: center;
+}
+
+.subsidy-list strong {
+  color: var(--ink);
+}
+
+.subsidy-list i {
+  grid-column: 1 / -1;
+  height: 7px;
+  min-width: 4px;
+  border-radius: 999px;
+  background: var(--green);
+}
+
 .action-queue div {
   display: grid;
   gap: 2px;
@@ -1223,7 +1279,7 @@ textarea {
 .admin-table-head,
 .admin-table-row {
   display: grid;
-  grid-template-columns: minmax(240px, 1.6fr) 80px 150px 150px 70px 70px 110px;
+  grid-template-columns: minmax(240px, 1.6fr) 70px 100px 150px 150px 70px 70px 110px;
   gap: 10px;
   align-items: center;
   border-bottom: 1px solid var(--line);
@@ -1351,6 +1407,7 @@ textarea {
   }
 
   .queue-summary,
+  .subsidy-list,
   .status-legend {
     grid-template-columns: 1fr;
   }

@@ -28,6 +28,15 @@ const statuses: ApplicationStatus[] = [
   "withdrawn",
 ];
 
+const subsidyPrograms = [
+  { fieldKey: "application.applyWaterDirectPayment", label: "水田活用の直接支払交付金" },
+  { fieldKey: "application.applyNewMarketRice", label: "コメ新市場開拓等促進事業" },
+  { fieldKey: "application.applyFieldCropFormation", label: "畑作物産地形成促進事業" },
+  { fieldKey: "application.applyFieldConversion", label: "畑地化促進事業" },
+  { fieldKey: "application.applyGeta", label: "畑作物の直接支払交付金（ゲタ）" },
+  { fieldKey: "application.applyNarashi", label: "収入減少影響緩和交付金（ナラシ）" },
+];
+
 export function buildDemoAdminData(count = 30): AdminDashboardData {
   const baseTime = Date.now();
   const applications = Array.from({ length: count }, (_, index) => {
@@ -35,6 +44,9 @@ export function buildDemoAdminData(count = 30): AdminDashboardData {
     const errorCount = index % 6 === 0 ? 2 : index % 5 === 0 ? 1 : 0;
     const warningCount = index % 4 === 0 ? 2 : index % 3 === 0 ? 1 : 0;
     const updatedAt = baseTime - index * 1000 * 60 * 44;
+    const totalAreaM2 = 1800 + (index % 8) * 420 + Math.floor(index / 3) * 120;
+    const cropAreaM2 = Math.round(totalAreaM2 * (0.82 + (index % 4) * 0.03));
+    const selectedPrograms = subsidyPrograms.filter((_, programIndex) => (index + programIndex) % 3 === 0).map((program) => program.fieldKey);
     return {
       id: `demo-application-${String(index + 1).padStart(2, "0")}`,
       title: `令和9年産 交付申請 / ${names[index % names.length]}`,
@@ -49,6 +61,9 @@ export function buildDemoAdminData(count = 30): AdminDashboardData {
       warningCount,
       ocrJobCount: index % 2 === 0 ? 1 : 0,
       exportJobCount: status === "exported" || status === "export_ready" ? 1 : 0,
+      totalAreaM2,
+      cropAreaM2,
+      subsidyPrograms: selectedPrograms,
     };
   });
 
@@ -67,6 +82,19 @@ export function buildDemoAdminData(count = 30): AdminDashboardData {
 
   const exportSuccessCount = applications.filter((application) => application.exportJobCount > 0).length;
   const ocrSuccessCount = applications.filter((application) => application.ocrJobCount > 0).length;
+  const areaSummary = applications.reduce(
+    (summary, application) => ({
+      totalAreaM2: summary.totalAreaM2 + (application.totalAreaM2 ?? 0),
+      cropAreaM2: summary.cropAreaM2 + (application.cropAreaM2 ?? 0),
+      applicationCountWithArea:
+        summary.applicationCountWithArea + ((application.totalAreaM2 ?? 0) > 0 || (application.cropAreaM2 ?? 0) > 0 ? 1 : 0),
+    }),
+    { totalAreaM2: 0, cropAreaM2: 0, applicationCountWithArea: 0 },
+  );
+  const subsidyCounts = subsidyPrograms.map((program) => ({
+    ...program,
+    count: applications.filter((application) => application.subsidyPrograms?.includes(program.fieldKey)).length,
+  }));
 
   return {
     generatedAt: baseTime,
@@ -81,6 +109,8 @@ export function buildDemoAdminData(count = 30): AdminDashboardData {
       queued: 2,
     },
     issueCounts,
+    areaSummary,
+    subsidyCounts,
     applications,
     recentAuditLogs: applications.slice(0, 12).map((application, index) => ({
       id: `demo-audit-${index + 1}`,
