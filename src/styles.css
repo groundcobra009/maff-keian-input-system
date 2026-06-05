@@ -773,6 +773,14 @@ textarea {
   font-weight: 700;
 }
 
+.chat-draft-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .chat-thread-large {
   display: grid;
   align-content: start;
@@ -1437,6 +1445,14 @@ textarea {
 
   .chat-draft-header {
     flex-direction: column;
+  }
+
+  .chat-draft-actions {
+    justify-content: stretch;
+  }
+
+  .chat-draft-actions button {
+    flex: 1 1 150px;
   }
 
   .draft-chat-message {

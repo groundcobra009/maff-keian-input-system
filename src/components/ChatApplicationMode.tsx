@@ -1,4 +1,4 @@
-import { BotMessageSquare, CheckCircle2, Loader2, Plus, Send, UserRound } from "lucide-react";
+import { BotMessageSquare, CheckCircle2, Loader2, Plus, Save, Send, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AppIdentity } from "../auth/AuthShell";
 import { fieldGroups, statusLabels } from "../data/formDefinition";
@@ -152,6 +152,10 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
     });
   };
 
+  const createDraftFromChat = () => {
+    void sendToAssistant("ここまでの会話内容で申請書の下書きを作成してください。未入力の重要項目があれば次の質問を1つだけ出してください。");
+  };
+
   const createDraft = async () => {
     if (creating) return;
     setCreating(true);
@@ -194,10 +198,16 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
                   </p>
                   {selectedId?.startsWith("optimistic-") ? <p className="admin-notice">Convex同期待ちの一時下書きです。</p> : null}
                 </div>
-                <button className="ghost-button" onClick={() => sendToAssistant("次の質問をお願いします。")} disabled={busy}>
-                  <BotMessageSquare size={18} />
-                  次の質問
-                </button>
+                <div className="chat-draft-actions">
+                  <button className="ghost-button" onClick={() => sendToAssistant("次の質問をお願いします。")} disabled={busy}>
+                    <BotMessageSquare size={18} />
+                    次の質問
+                  </button>
+                  <button className="primary-button" onClick={createDraftFromChat} disabled={busy}>
+                    {busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />}
+                    下書き作成
+                  </button>
+                </div>
               </div>
 
               <div className="chat-thread-large">
