@@ -65,7 +65,7 @@ function TestAuth({ children }: AuthShellProps) {
 }
 
 function WorkosAuth({ children }: AuthShellProps) {
-  const { isLoading, user, signIn, signOut } = useAuth();
+  const { isLoading, user, signIn, signUp, signOut } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,7 +74,12 @@ function WorkosAuth({ children }: AuthShellProps) {
         setAuthError(error instanceof Error ? error.message : "ログインを開始できませんでした");
       });
     }
-  }, [signIn]);
+    if (window.location.pathname === "/sign-up") {
+      signUp().catch((error) => {
+        setAuthError(error instanceof Error ? error.message : "新規登録を開始できませんでした");
+      });
+    }
+  }, [signIn, signUp]);
 
   if (isLoading) {
     return (
@@ -94,10 +99,21 @@ function WorkosAuth({ children }: AuthShellProps) {
           <ShieldCheck size={30} />
           <p className="eyebrow">WorkOS AuthKit</p>
           <h1>経営安定申請入力システム</h1>
-          <p>Google認証を含むWorkOSのログイン画面から利用を開始します。</p>
+          <p>初回は新規登録、登録済みの場合はログインから利用を開始します。</p>
           {authError ? <p className="auth-error">{authError}</p> : null}
           <button
             className="primary-button"
+            onClick={() =>
+              signUp().catch((error) => {
+                setAuthError(error instanceof Error ? error.message : "新規登録を開始できませんでした");
+              })
+            }
+          >
+            <LogIn size={18} />
+            Googleで新規登録
+          </button>
+          <button
+            className="ghost-button"
             onClick={() =>
               signIn().catch((error) => {
                 setAuthError(error instanceof Error ? error.message : "ログインを開始できませんでした");
@@ -105,7 +121,7 @@ function WorkosAuth({ children }: AuthShellProps) {
             }
           >
             <LogIn size={18} />
-            Google / WorkOSでログイン
+            登録済みの方はこちら
           </button>
         </div>
       </div>

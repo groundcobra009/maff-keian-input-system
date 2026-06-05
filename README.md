@@ -72,9 +72,10 @@ WorkOS AuthKitのClient-only React構成を使います。
 1. WorkOS DashboardでAuthKitを有効化
 2. Redirect URIにローカルなら `http://localhost:5173` または `http://localhost:5173/callback` を登録
 3. Sign-in endpointに `/login` を登録
-4. SessionsのCORS Allowed originsに `http://localhost:5173` とVercel本番URLを登録
-5. Social LoginでGoogleを有効化
-6. `.env.local` またはVercel環境変数に `VITE_AUTH_MODE=workos` と `VITE_WORKOS_CLIENT_ID` を設定
+4. Sign-up URLに `https://maff-keian.vercel.app/sign-up` を登録
+5. SessionsのCORS Allowed originsに `http://localhost:5173` とVercel本番URLを登録
+6. Social LoginでGoogleを有効化
+7. `.env.local` またはVercel環境変数に `VITE_AUTH_MODE=workos` と `VITE_WORKOS_CLIENT_ID` を設定
 
 ## Vercelデプロイ
 
