@@ -17,7 +17,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { fieldGroups, modelOptions, statusLabels } from "../data/formDefinition";
+import { fieldGroups, statusLabels } from "../data/formDefinition";
 import type {
   ApplicationDetail,
   AppRecord,
@@ -27,6 +27,11 @@ import type {
   PrimitiveValue,
 } from "../types";
 import type { AppIdentity } from "../auth/AuthShell";
+
+const defaultOcrModel = {
+  provider: "anthropic" as const,
+  modelId: "claude-opus-4-8",
+};
 
 type Props = {
   mode: "local" | "convex";
@@ -52,7 +57,6 @@ type Props = {
 
 export function ApplicationWorkspace(props: Props) {
   const [activeGroup, setActiveGroup] = useState(fieldGroups[0].id);
-  const [selectedModel, setSelectedModel] = useState<(typeof modelOptions)[number]>(modelOptions[0]);
   const [file, setFile] = useState<File | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
 
@@ -198,23 +202,10 @@ export function ApplicationWorkspace(props: Props) {
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
             </label>
-            <select
-              value={`${selectedModel.provider}:${selectedModel.modelId}`}
-              onChange={(event) => {
-                const next = modelOptions.find((model) => `${model.provider}:${model.modelId}` === event.target.value);
-                if (next) setSelectedModel(next);
-              }}
-            >
-              {modelOptions.map((model) => (
-                <option key={`${model.provider}:${model.modelId}`} value={`${model.provider}:${model.modelId}`}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
             <button
               className="primary-button full"
               disabled={!file || !props.detail || props.busy}
-              onClick={() => file && props.onUploadOcr(file, selectedModel.provider, selectedModel.modelId)}
+              onClick={() => file && props.onUploadOcr(file, defaultOcrModel.provider, defaultOcrModel.modelId)}
             >
               {props.busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />}
               下書き保存
