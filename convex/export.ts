@@ -1,6 +1,18 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
+
+type ExportPayload = {
+  application: Doc<"applications">;
+  values: Doc<"applicationValues">[];
+};
+
+type GenerateCsvResult = {
+  exportJobId: Id<"exportJobs">;
+  fileName: string;
+  content: string;
+};
 
 const csvColumns = [
   ["1", "ファイル識別コード", "1"],
@@ -23,10 +35,10 @@ const csvColumns = [
 
 export const generateCsv = action({
   args: { applicationId: v.id("applications") },
-  handler: async (ctx, args) => {
-    const payload = await ctx.runQuery(internal.export.getExportPayload, {
+  handler: async (ctx, args): Promise<GenerateCsvResult> => {
+    const payload = (await ctx.runQuery(internal.export.getExportPayload, {
       applicationId: args.applicationId,
-    });
+    })) as ExportPayload | null;
     if (!payload) throw new Error("Application not found");
     const valueMap = new Map(payload.values.map((item) => [item.fieldKey, item.value]));
     const row = csvColumns.map(([, , key]) => {
@@ -51,7 +63,7 @@ export const generateCsv = action({
 
 export const getExportPayload = internalQuery({
   args: { applicationId: v.id("applications") },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ExportPayload | null> => {
     const application = await ctx.db.get(args.applicationId);
     if (!application) return null;
     const values = await ctx.db
@@ -68,7 +80,7 @@ export const saveExportJob = internalMutation({
     fileName: v.string(),
     content: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"exportJobs">> => {
     const timestamp = Date.now();
     const exportJobId = await ctx.db.insert("exportJobs", {
       applicationId: args.applicationId,
