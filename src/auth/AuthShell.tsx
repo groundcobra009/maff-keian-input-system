@@ -67,6 +67,7 @@ function TestAuth({ children }: AuthShellProps) {
 function WorkosAuth({ children }: AuthShellProps) {
   const { isLoading, user, signIn, signUp, signOut } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
+  const [useTestMode, setUseTestMode] = useState(false);
 
   useEffect(() => {
     if (window.location.pathname === "/login") {
@@ -80,6 +81,10 @@ function WorkosAuth({ children }: AuthShellProps) {
       });
     }
   }, [signIn, signUp]);
+
+  if (useTestMode) {
+    return <TestAuth>{children}</TestAuth>;
+  }
 
   if (isLoading) {
     return (
@@ -123,6 +128,12 @@ function WorkosAuth({ children }: AuthShellProps) {
             <LogIn size={18} />
             登録済みの方はこちら
           </button>
+          {workosDevMode ? (
+            <button className="ghost-button" onClick={() => setUseTestMode(true)}>
+              <ShieldCheck size={18} />
+              ログインなしでテスト利用
+            </button>
+          ) : null}
         </div>
       </div>
     );
