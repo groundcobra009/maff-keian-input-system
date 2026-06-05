@@ -43,5 +43,12 @@ export const convexApi = {
       { applicationId: string; status: string; actor?: string },
       null
     >("admin:setApplicationStatus"),
+    saveCouncilSettings: makeFunctionReference<
+      "mutation",
+      { councilName?: string; prefectureCode?: string; councilCode?: string; managementCode?: string; actor?: string },
+      null
+    >("admin:saveCouncilSettings"),
+    addAdminUser: makeFunctionReference<"mutation", { email: string; actor?: string }, string>("admin:addAdminUser"),
+    removeAdminUser: makeFunctionReference<"mutation", { adminUserId: string; actor?: string }, null>("admin:removeAdminUser"),
   },
 };

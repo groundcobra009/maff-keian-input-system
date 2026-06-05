@@ -33,7 +33,7 @@ JSON形式:
 }
 主なfieldKey:
 applicant.nameKanji, applicant.nameKana, applicant.postalCode, applicant.address,
-applicant.phone, applicant.email, application.managementCode,
+applicant.phone, applicant.email,
 application.applyWaterDirectPayment, application.applyGeta, application.applyNarashi,
 account.bankCode, account.branchCode, account.accountNumber
 `;

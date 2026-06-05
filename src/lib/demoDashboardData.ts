@@ -111,6 +111,23 @@ export function buildDemoAdminData(count = 30): AdminDashboardData {
     issueCounts,
     areaSummary,
     subsidyCounts,
+    councilSettings: {
+      councilName: "関東農業再生協",
+      prefectureCode: "13",
+      councilCode: "001",
+      managementCode: "0000000000001",
+      updatedAt: baseTime,
+      updatedBy: "demo",
+    },
+    adminUsers: [
+      {
+        id: "demo-admin-1",
+        email: "keian@example.local",
+        role: "owner",
+        addedAt: baseTime,
+        addedBy: "demo",
+      },
+    ],
     applications,
     recentAuditLogs: applications.slice(0, 12).map((application, index) => ({
       id: `demo-audit-${index + 1}`,

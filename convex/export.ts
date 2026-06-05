@@ -6,6 +6,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 type ExportPayload = {
   application: Doc<"applications">;
   values: Doc<"applicationValues">[];
+  councilSettings: Doc<"councilSettings"> | null;
 };
 
 type GenerateCsvResult = {
@@ -45,6 +46,9 @@ export const generateCsv = action({
       if (key === "1") return "1";
       if (key === "application.year") return payload.application.year;
       if (key === "application.submittedDate") return toDate(new Date());
+      if (key === "application.prefectureCode") return payload.councilSettings?.prefectureCode ?? valueMap.get(key) ?? "";
+      if (key === "application.councilCode") return payload.councilSettings?.councilCode ?? valueMap.get(key) ?? "";
+      if (key === "application.managementCode") return payload.councilSettings?.managementCode ?? valueMap.get(key) ?? "";
       return valueMap.get(key) ?? "";
     });
     const csv = [
@@ -70,7 +74,11 @@ export const getExportPayload = internalQuery({
       .query("applicationValues")
       .withIndex("by_application", (q) => q.eq("applicationId", args.applicationId))
       .collect();
-    return { application, values };
+    const councilSettings = await ctx.db
+      .query("councilSettings")
+      .withIndex("by_scope", (q) => q.eq("scope", "default"))
+      .unique();
+    return { application, values, councilSettings };
   },
 });
 

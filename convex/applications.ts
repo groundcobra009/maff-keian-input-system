@@ -196,7 +196,6 @@ export const validate = mutation({
       ["applicant.nameKana", "交付申請者名（フリガナ）は必須です"],
       ["applicant.postalCode", "郵便番号は必須です"],
       ["applicant.phone", "電話番号は必須です"],
-      ["application.managementCode", "地域協議会等管理コードは必須です"],
     ];
 
     let errorCount = 0;

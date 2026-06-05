@@ -1,8 +1,8 @@
-import { Activity, AlertCircle, Clock3, Database, FileCheck2, FileDown, ListChecks, Search, ShieldCheck, ScanText } from "lucide-react";
+import { Activity, AlertCircle, Building2, Clock3, Database, FileCheck2, FileDown, ListChecks, Mail, Search, ShieldCheck, ScanText, Trash2, UserPlus } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fieldGroups, statusLabels } from "../data/formDefinition";
-import type { AdminDashboardData, ApplicationStatus } from "../types";
+import type { AdminDashboardData, ApplicationStatus, CouncilSettings } from "../types";
 import type { AppIdentity } from "../auth/AuthShell";
 
 type Props = {
@@ -12,6 +12,9 @@ type Props = {
   notice?: string;
   statusReadOnly?: boolean;
   onStatusChange: (applicationId: string, status: ApplicationStatus) => Promise<void> | void;
+  onSaveCouncilSettings?: (settings: CouncilSettings) => Promise<void> | void;
+  onAddAdminUser?: (email: string) => Promise<void> | void;
+  onRemoveAdminUser?: (adminUserId: string) => Promise<void> | void;
 };
 
 const statusOptions: ApplicationStatus[] = [
@@ -30,8 +33,29 @@ const subsidyFields = fieldGroups
   .find((group) => group.id === "programs")!
   .fields.map((field) => ({ fieldKey: field.key, label: field.label }));
 
-export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, onStatusChange }: Props) {
+export function AdminDashboard({
+  mode,
+  identity,
+  data,
+  notice,
+  statusReadOnly,
+  onStatusChange,
+  onSaveCouncilSettings,
+  onAddAdminUser,
+  onRemoveAdminUser,
+}: Props) {
   const [search, setSearch] = useState("");
+  const [settingsDraft, setSettingsDraft] = useState<CouncilSettings>(data.councilSettings ?? {});
+  const [adminEmail, setAdminEmail] = useState("");
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [adminUserSaving, setAdminUserSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [adminUserMessage, setAdminUserMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSettingsDraft(data.councilSettings ?? {});
+  }, [data.councilSettings]);
+
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return data.applications;
@@ -74,6 +98,38 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
     .filter((application) => application.errorCount > 0 || application.warningCount > 0 || application.status === "returned")
     .sort((a, b) => b.errorCount - a.errorCount || b.warningCount - a.warningCount || b.updatedAt - a.updatedAt)
     .slice(0, 5);
+  const adminUsers = data.adminUsers ?? [];
+  const updateSetting = (key: keyof CouncilSettings, value: string) => {
+    setSettingsDraft((current) => ({ ...current, [key]: value }));
+  };
+  const saveSettings = async () => {
+    if (!onSaveCouncilSettings || settingsSaving) return;
+    setSettingsSaving(true);
+    setSettingsMessage(null);
+    try {
+      await onSaveCouncilSettings(settingsDraft);
+      setSettingsMessage("協議会設定を保存しました。");
+    } catch {
+      setSettingsMessage("協議会設定の保存に失敗しました。");
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+  const addAdminUser = async () => {
+    const email = adminEmail.trim();
+    if (!email || !onAddAdminUser || adminUserSaving) return;
+    setAdminUserSaving(true);
+    setAdminUserMessage(null);
+    try {
+      await onAddAdminUser(email);
+      setAdminEmail("");
+      setAdminUserMessage("管理者メールを追加しました。");
+    } catch {
+      setAdminUserMessage("管理者メールの追加に失敗しました。");
+    } finally {
+      setAdminUserSaving(false);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -246,6 +302,86 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
               ) : (
                 <p className="subtle">優先対応が必要な申請はありません。</p>
               )}
+            </div>
+          </div>
+        </section>
+
+        <section className="admin-section">
+          <div className="admin-section-heading">
+            <div>
+              <h2>協議会設定・管理者</h2>
+              <p>申請者に聞かない固定コードと、管理画面を扱うメールアドレスを管理します。</p>
+            </div>
+          </div>
+          <div className="admin-settings-grid">
+            <div className="settings-panel">
+              <div className="settings-panel-heading">
+                <Building2 size={18} />
+                <h3>協議会設定</h3>
+              </div>
+              <div className="settings-fields">
+                <label>
+                  <span>協議会名</span>
+                  <input value={settingsDraft.councilName ?? ""} onChange={(event) => updateSetting("councilName", event.target.value)} placeholder="例: 関東農業再生協議会" />
+                </label>
+                <label>
+                  <span>都道府県コード</span>
+                  <input value={settingsDraft.prefectureCode ?? ""} onChange={(event) => updateSetting("prefectureCode", event.target.value)} placeholder="13" inputMode="numeric" />
+                </label>
+                <label>
+                  <span>地域協議会コード</span>
+                  <input value={settingsDraft.councilCode ?? ""} onChange={(event) => updateSetting("councilCode", event.target.value)} placeholder="001" inputMode="numeric" />
+                </label>
+                <label>
+                  <span>地域協議会等管理コード</span>
+                  <input value={settingsDraft.managementCode ?? ""} onChange={(event) => updateSetting("managementCode", event.target.value)} placeholder="13桁" inputMode="numeric" />
+                </label>
+              </div>
+              <div className="settings-actions">
+                <button className="primary-button" onClick={saveSettings} disabled={!onSaveCouncilSettings || settingsSaving}>
+                  <ShieldCheck size={16} />
+                  {settingsSaving ? "保存中" : "設定を保存"}
+                </button>
+                {settingsMessage ? <span>{settingsMessage}</span> : null}
+              </div>
+            </div>
+
+            <div className="settings-panel">
+              <div className="settings-panel-heading">
+                <Mail size={18} />
+                <h3>管理者ユーザー</h3>
+              </div>
+              <div className="admin-user-form">
+                <input
+                  value={adminEmail}
+                  onChange={(event) => setAdminEmail(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void addAdminUser();
+                  }}
+                  placeholder="admin@example.jp"
+                  type="email"
+                />
+                <button className="primary-button" onClick={addAdminUser} disabled={!onAddAdminUser || adminUserSaving || !adminEmail.trim()}>
+                  <UserPlus size={16} />
+                  追加
+                </button>
+              </div>
+              {adminUserMessage ? <p className="settings-message">{adminUserMessage}</p> : null}
+              <div className="admin-user-list">
+                {adminUsers.length ? (
+                  adminUsers.map((user) => (
+                    <div key={user.id}>
+                      <span>{user.email}</span>
+                      <small>{user.role === "owner" ? "オーナー" : "管理者"}</small>
+                      <button type="button" onClick={() => void onRemoveAdminUser?.(user.id)} disabled={!onRemoveAdminUser}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="subtle">管理者メールはまだ登録されていません。</p>
+                )}
+              </div>
             </div>
           </div>
         </section>

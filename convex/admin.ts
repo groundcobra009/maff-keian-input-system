@@ -22,15 +22,22 @@ const subsidyPrograms = [
   { fieldKey: "application.applyNarashi", label: "収入減少影響緩和交付金（ナラシ）" },
 ];
 
+const settingsScope = "default";
+
 export const dashboard = query({
   args: {},
   handler: async (ctx) => {
-    const [applications, ocrJobs, exportJobs, issues, auditLogs] = await Promise.all([
+    const [applications, ocrJobs, exportJobs, issues, auditLogs, adminUsers, councilSettings] = await Promise.all([
       ctx.db.query("applications").order("desc").take(200),
       ctx.db.query("ocrJobs").order("desc").take(200),
       ctx.db.query("exportJobs").order("desc").take(200),
       ctx.db.query("validationIssues").order("desc").take(300),
       ctx.db.query("auditLogs").order("desc").take(50),
+      ctx.db.query("adminUsers").order("desc").take(100),
+      ctx.db
+        .query("councilSettings")
+        .withIndex("by_scope", (q) => q.eq("scope", settingsScope))
+        .unique(),
     ]);
 
     const issueCountByApplication = new Map<string, { errors: number; warnings: number }>();
@@ -156,6 +163,23 @@ export const dashboard = query({
         detail: log.detail,
         createdAt: log.createdAt,
       })),
+      councilSettings: councilSettings
+        ? {
+            councilName: councilSettings.councilName,
+            prefectureCode: councilSettings.prefectureCode,
+            councilCode: councilSettings.councilCode,
+            managementCode: councilSettings.managementCode,
+            updatedAt: councilSettings.updatedAt,
+            updatedBy: councilSettings.updatedBy,
+          }
+        : null,
+      adminUsers: adminUsers.map((user) => ({
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        addedAt: user.addedAt,
+        addedBy: user.addedBy,
+      })),
     };
   },
 });
@@ -181,3 +205,95 @@ export const setApplicationStatus = mutation({
     });
   },
 });
+
+export const saveCouncilSettings = mutation({
+  args: {
+    councilName: v.optional(v.string()),
+    prefectureCode: v.optional(v.string()),
+    councilCode: v.optional(v.string()),
+    managementCode: v.optional(v.string()),
+    actor: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const timestamp = Date.now();
+    const existing = await ctx.db
+      .query("councilSettings")
+      .withIndex("by_scope", (q) => q.eq("scope", settingsScope))
+      .unique();
+    const settings = {
+      scope: settingsScope,
+      councilName: cleanOptional(args.councilName),
+      prefectureCode: cleanOptional(args.prefectureCode),
+      councilCode: cleanOptional(args.councilCode),
+      managementCode: cleanOptional(args.managementCode),
+      updatedAt: timestamp,
+      updatedBy: args.actor,
+    };
+    if (existing) await ctx.db.patch(existing._id, settings);
+    else await ctx.db.insert("councilSettings", settings);
+    await ctx.db.insert("auditLogs", {
+      actor: args.actor ?? "admin",
+      action: "admin.council_settings.save",
+      detail: settings.councilCode ?? settings.councilName ?? "",
+      createdAt: timestamp,
+    });
+  },
+});
+
+export const addAdminUser = mutation({
+  args: {
+    email: v.string(),
+    actor: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const email = normalizeEmail(args.email);
+    if (!email) throw new Error("メールアドレスを入力してください");
+    const timestamp = Date.now();
+    const existing = await ctx.db
+      .query("adminUsers")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .unique();
+    if (existing) return existing._id;
+    const adminUserId = await ctx.db.insert("adminUsers", {
+      email,
+      role: "admin",
+      addedAt: timestamp,
+      addedBy: args.actor,
+    });
+    await ctx.db.insert("auditLogs", {
+      actor: args.actor ?? "admin",
+      action: "admin.user.add",
+      detail: email,
+      createdAt: timestamp,
+    });
+    return adminUserId;
+  },
+});
+
+export const removeAdminUser = mutation({
+  args: {
+    adminUserId: v.id("adminUsers"),
+    actor: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const timestamp = Date.now();
+    const adminUser = await ctx.db.get(args.adminUserId);
+    if (!adminUser) return;
+    await ctx.db.delete(args.adminUserId);
+    await ctx.db.insert("auditLogs", {
+      actor: args.actor ?? "admin",
+      action: "admin.user.remove",
+      detail: adminUser.email,
+      createdAt: timestamp,
+    });
+  },
+});
+
+function normalizeEmail(value: string) {
+  const email = value.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+}
+
+function cleanOptional(value?: string) {
+  return value?.trim() ?? "";
+}

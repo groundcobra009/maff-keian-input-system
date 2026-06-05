@@ -9,6 +9,23 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_code", ["code"]),
 
+  councilSettings: defineTable({
+    scope: v.string(),
+    councilName: v.optional(v.string()),
+    prefectureCode: v.optional(v.string()),
+    councilCode: v.optional(v.string()),
+    managementCode: v.optional(v.string()),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.string()),
+  }).index("by_scope", ["scope"]),
+
+  adminUsers: defineTable({
+    email: v.string(),
+    role: v.union(v.literal("admin"), v.literal("owner")),
+    addedAt: v.number(),
+    addedBy: v.optional(v.string()),
+  }).index("by_email", ["email"]),
+
   applicants: defineTable({
     organizationId: v.optional(v.id("organizations")),
     managementCode: v.string(),

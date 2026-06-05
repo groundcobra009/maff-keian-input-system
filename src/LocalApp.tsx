@@ -5,13 +5,15 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { ChatApplicationMode } from "./components/ChatApplicationMode";
 import { initialApplications, initialDetail } from "./lib/localSeed";
 import { buildLocalCsv, downloadText } from "./lib/download";
-import type { AdminDashboardData, ApplicationDetail, ApplicationStatus, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
+import type { AdminDashboardData, AdminUser, ApplicationDetail, ApplicationStatus, AppRecord, CouncilSettings, LandParcel, OcrProvider, PrimitiveValue } from "./types";
 import type { ValidationIssue } from "./types";
 
 type LocalDraftState = {
   applications: AppRecord[];
   selectedId: string | null;
   details: Record<string, ApplicationDetail>;
+  councilSettings?: CouncilSettings;
+  adminUsers?: AdminUser[];
 };
 
 const localStorageKey = "maff-keian-local-drafts";
@@ -29,6 +31,8 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   const [applications, setApplications] = useState<AppRecord[]>(restored.applications);
   const [selectedId, setSelectedId] = useState(restored.selectedId);
   const [details, setDetails] = useState<Record<string, ApplicationDetail>>(restored.details);
+  const [councilSettings, setCouncilSettings] = useState<CouncilSettings>(restored.councilSettings ?? {});
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>(restored.adminUsers ?? []);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<AppView>("input");
@@ -46,15 +50,15 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   };
 
   useEffect(() => {
-    writeLocalDrafts({ applications, selectedId, details });
-  }, [applications, selectedId, details]);
+    writeLocalDrafts({ applications, selectedId, details, councilSettings, adminUsers });
+  }, [adminUsers, applications, councilSettings, selectedId, details]);
 
   const manualSave = () => {
-    writeLocalDrafts({ applications, selectedId, details });
+    writeLocalDrafts({ applications, selectedId, details, councilSettings, adminUsers });
     setLastManualSaveAt(Date.now());
   };
 
-  const adminData = useMemo(() => buildLocalAdminData(applications, details), [applications, details]);
+  const adminData = useMemo(() => buildLocalAdminData(applications, details, councilSettings, adminUsers), [adminUsers, applications, councilSettings, details]);
 
   const createDraft = () => {
     const id = crypto.randomUUID();
@@ -101,6 +105,29 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
                 [applicationId]: touch({ ...target, application: { ...target.application, status } }),
               };
             });
+          }}
+          onSaveCouncilSettings={(settings) => {
+            setCouncilSettings({ ...settings, updatedAt: Date.now(), updatedBy: identity.email ?? identity.displayName });
+          }}
+          onAddAdminUser={(email) => {
+            const normalized = email.trim().toLowerCase();
+            if (!normalized) return;
+            setAdminUsers((current) => {
+              if (current.some((user) => user.email === normalized)) return current;
+              return [
+                {
+                  id: crypto.randomUUID(),
+                  email: normalized,
+                  role: "admin",
+                  addedAt: Date.now(),
+                  addedBy: identity.email ?? identity.displayName,
+                },
+                ...current,
+              ];
+            });
+          }}
+          onRemoveAdminUser={(adminUserId) => {
+            setAdminUsers((current) => current.filter((user) => user.id !== adminUserId));
           }}
         />
       ) : view === "chat" ? (
@@ -197,7 +224,6 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
       onValidate={() => {
         patchDetail((current) => {
           const required = [
-            ["application.managementCode", "地域協議会等管理コードは必須です"],
             ["applicant.nameKana", "交付申請者名（フリガナ）は必須です"],
             ["applicant.nameKanji", "交付申請者名（漢字）は必須です"],
             ["applicant.phone", "電話番号は必須です"],
@@ -220,7 +246,7 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
       }}
       onExportCsv={() => {
         if (!detail) return;
-        const csv = buildLocalCsv(valueMap, detail.application.year);
+        const csv = buildLocalCsv(valueMap, detail.application.year, councilSettings);
         downloadText(`common_application_${detail.application.year}_${detail.application.id}.csv`, csv);
         patchDetail((current) => touch({ ...current, application: { ...current.application, status: "exported" } }));
       }}
@@ -262,7 +288,12 @@ function writeLocalDrafts(state: LocalDraftState) {
   window.localStorage.setItem(localStorageKey, JSON.stringify(state));
 }
 
-function buildLocalAdminData(applications: AppRecord[], details: Record<string, ApplicationDetail>): AdminDashboardData {
+function buildLocalAdminData(
+  applications: AppRecord[],
+  details: Record<string, ApplicationDetail>,
+  councilSettings: CouncilSettings,
+  adminUsers: AdminUser[],
+): AdminDashboardData {
   const statusCounts: Record<string, number> = {};
   for (const application of applications) statusCounts[application.status] = (statusCounts[application.status] ?? 0) + 1;
   const allIssues = Object.values(details).flatMap((detail) => detail.issues);
@@ -293,6 +324,8 @@ function buildLocalAdminData(applications: AppRecord[], details: Record<string, 
     },
     areaSummary,
     subsidyCounts,
+    councilSettings,
+    adminUsers,
     applications: applications.map((application) => {
       const detail = details[application.id];
       const totalAreaM2 = detail?.parcels.reduce((sum, parcel) => sum + (parcel.mainAreaM2 ?? 0), 0) ?? 0;

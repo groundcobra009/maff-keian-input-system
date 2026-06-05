@@ -1244,6 +1244,97 @@ textarea {
   font-size: 13px;
 }
 
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 14px;
+}
+
+.settings-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+  background: #fff;
+}
+
+.settings-panel-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-panel-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.settings-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-fields span,
+.settings-actions span,
+.settings-message {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-actions,
+.admin-user-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-user-form input {
+  flex: 1 1 220px;
+}
+
+.admin-user-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-user-list div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 36px;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.admin-user-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.admin-user-list small {
+  color: var(--muted);
+}
+
+.admin-user-list button {
+  min-height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
+}
+
 .admin-section {
   padding: 16px;
   display: grid;
@@ -1429,8 +1520,13 @@ textarea {
   }
 
   .queue-summary,
+  .admin-settings-grid,
   .subsidy-list,
   .status-legend {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-fields {
     grid-template-columns: 1fr;
   }
 

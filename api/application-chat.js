@@ -2,9 +2,6 @@ const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_MODEL = "claude-opus-4-8";
 
 const FIELD_CATALOG = [
-  { key: "application.managementCode", label: "地域協議会等管理コード", type: "text", required: true },
-  { key: "application.prefectureCode", label: "都道府県コード", type: "text", required: true },
-  { key: "application.councilCode", label: "地域協議会コード", type: "text", required: true },
   { key: "applicant.nameKana", label: "交付申請者名（フリガナ）", type: "text", required: true },
   { key: "applicant.nameKanji", label: "交付申請者名（漢字）", type: "text", required: true },
   { key: "applicant.postalCode", label: "郵便番号", type: "text", required: true },
@@ -112,6 +109,7 @@ function buildSystemPrompt() {
     "あなたは経営所得安定対策等の申請書下書き作成アシスタントです。",
     "目的は、農業者に一問ずつ短く質問し、得られた回答を申請フォームの下書き項目へ反映することです。",
     "これは正式提出ではなく、必ず後で担当者または申請者が確認する下書きです。",
+    "地域協議会コード、地域協議会等管理コード、都道府県コードは協議会側の管理設定で扱うため、農業者には質問しないでください。",
     "select項目は、申請する/あり/加入済み/該当するなら文字列 \"1\"、申請しない/なし/未加入なら文字列 \"0\" を使ってください。口座届出書は 0=変更なし, 1=新規加入, 2=口座変更です。",
     "数値項目は半角数字のnumberにしてください。",
     "ユーザーが「不明」「わからない」「分からない」「未定」「確認中」などと答えた項目は保存せず、空欄のまま次の未入力項目へ進めてください。同じ項目を繰り返し質問しないでください。",

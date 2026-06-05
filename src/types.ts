@@ -116,6 +116,23 @@ export type AdminAuditLog = {
   createdAt: number;
 };
 
+export type CouncilSettings = {
+  councilName?: string;
+  prefectureCode?: string;
+  councilCode?: string;
+  managementCode?: string;
+  updatedAt?: number;
+  updatedBy?: string;
+};
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  role: "admin" | "owner";
+  addedAt: number;
+  addedBy?: string;
+};
+
 export type AdminDashboardData = {
   generatedAt: number;
   statusCounts: Record<string, number>;
@@ -135,6 +152,8 @@ export type AdminDashboardData = {
     label: string;
     count: number;
   }>;
+  councilSettings?: CouncilSettings | null;
+  adminUsers?: AdminUser[];
   applications: AdminApplicationRow[];
   recentAuditLogs: AdminAuditLog[];
 };

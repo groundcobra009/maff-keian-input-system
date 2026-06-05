@@ -8,7 +8,13 @@ export function downloadText(filename: string, content: string, mimeType = "text
   URL.revokeObjectURL(url);
 }
 
-export function buildLocalCsv(values: Map<string, string | number | boolean | null>, year: string) {
+type LocalCouncilSettings = {
+  prefectureCode?: string;
+  councilCode?: string;
+  managementCode?: string;
+};
+
+export function buildLocalCsv(values: Map<string, string | number | boolean | null>, year: string, councilSettings?: LocalCouncilSettings | null) {
   const headers = [
     "ファイル識別コード",
     "都道府県コード",
@@ -24,9 +30,9 @@ export function buildLocalCsv(values: Map<string, string | number | boolean | nu
   ];
   const row = [
     "1",
-    values.get("application.prefectureCode") ?? "",
-    values.get("application.councilCode") ?? "",
-    values.get("application.managementCode") ?? "",
+    councilSettings?.prefectureCode ?? values.get("application.prefectureCode") ?? "",
+    councilSettings?.councilCode ?? values.get("application.councilCode") ?? "",
+    councilSettings?.managementCode ?? values.get("application.managementCode") ?? "",
     year,
     values.get("applicant.nameKana") ?? "",
     values.get("applicant.nameKanji") ?? "",

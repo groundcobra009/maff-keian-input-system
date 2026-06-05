@@ -32,6 +32,9 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   const rejectOcr = useMutation(convexApi.ocr.rejectResult);
   const generateCsv = useAction(convexApi.export.generateCsv);
   const setApplicationStatus = useMutation(convexApi.admin.setApplicationStatus);
+  const saveCouncilSettings = useMutation(convexApi.admin.saveCouncilSettings);
+  const addAdminUser = useMutation(convexApi.admin.addAdminUser);
+  const removeAdminUser = useMutation(convexApi.admin.removeAdminUser);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
   const [view, setView] = useState<AppView>("input");
   const demoAdminData = useMemo(() => buildDemoAdminData(30), []);
@@ -174,6 +177,15 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
           statusReadOnly={usingDemoAdminData}
           onStatusChange={async (applicationId: string, status: ApplicationStatus) => {
             await setApplicationStatus({ applicationId, status, actor: identity.email ?? identity.displayName });
+          }}
+          onSaveCouncilSettings={async (settings) => {
+            await saveCouncilSettings({ ...settings, actor: identity.email ?? identity.displayName });
+          }}
+          onAddAdminUser={async (email) => {
+            await addAdminUser({ email, actor: identity.email ?? identity.displayName });
+          }}
+          onRemoveAdminUser={async (adminUserId) => {
+            await removeAdminUser({ adminUserId, actor: identity.email ?? identity.displayName });
           }}
         />
       ) : view === "chat" ? (

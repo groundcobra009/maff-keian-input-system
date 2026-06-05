@@ -9,11 +9,8 @@ export const fieldGroups: FieldGroup[] = [
   {
     id: "applicant",
     title: "申請者情報",
-    summary: "氏名、住所、連絡先、管理コード",
+    summary: "氏名、住所、連絡先",
     fields: [
-      { key: "application.managementCode", label: "地域協議会等管理コード", type: "text", required: true, placeholder: "13桁" },
-      { key: "application.prefectureCode", label: "都道府県コード", type: "text", required: true, placeholder: "01-47" },
-      { key: "application.councilCode", label: "地域協議会コード", type: "text", required: true, placeholder: "001-999" },
       { key: "applicant.nameKana", label: "交付申請者名（フリガナ）", type: "text", required: true },
       { key: "applicant.nameKanji", label: "交付申請者名（漢字）", type: "text", required: true },
       { key: "applicant.postalCode", label: "郵便番号", type: "text", required: true, placeholder: "100-0000" },
