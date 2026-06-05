@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Keian agricultural water icon">
+  <rect width="64" height="64" rx="14" fill="#1f6f43"/>
+  <circle cx="45" cy="17" r="8" fill="#c9472c"/>
+  <path d="M9 44c8-5 15-5 23 0s15 5 23 0" fill="none" stroke="#9ed6df" stroke-width="4" stroke-linecap="round"/>
+  <path d="M9 52c8-5 15-5 23 0s15 5 23 0" fill="none" stroke="#d7f1ef" stroke-width="3" stroke-linecap="round"/>
+  <path d="M22 49c2-14 7-25 18-34" fill="none" stroke="#f3c95f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M31 31c-6-5-11-7-16-6 4 6 9 8 16 6Z" fill="#f3c95f"/>
+  <path d="M35 25c-5-6-8-10-8-15 7 2 10 7 8 15Z" fill="#f3c95f"/>
+  <path d="M38 22c5-6 10-8 15-7-3 6-8 9-15 7Z" fill="#f3c95f"/>
+  <path d="M28 39c-6-4-12-5-17-3 5 5 10 6 17 3Z" fill="#e9b949"/>
+</svg>
