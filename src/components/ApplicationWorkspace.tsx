@@ -182,7 +182,7 @@ export function ApplicationWorkspace(props: Props) {
         </section>
 
         <aside className="right-panel">
-          <ChatDraftAssistant valueMap={valueMap} onSave={props.onSaveField} />
+          <ChatDraftAssistant valueMap={valueMap} disabled={!props.detail} onSave={props.onSaveField} />
 
           <section className="tool-block">
             <div className="tool-heading">
@@ -278,9 +278,11 @@ type ChatMessage = {
 
 function ChatDraftAssistant({
   valueMap,
+  disabled,
   onSave,
 }: {
   valueMap: Map<string, PrimitiveValue>;
+  disabled: boolean;
   onSave: (fieldKey: string, value: PrimitiveValue) => Promise<void> | void;
 }) {
   const fields = useMemo(() => fieldGroups.flatMap((group) => group.fields), []);
@@ -322,6 +324,10 @@ function ChatDraftAssistant({
         <BotMessageSquare size={18} />
         <h2>質問で下書き入力</h2>
       </div>
+      {disabled ? (
+        <p className="subtle">新規申請を作成すると、質問に答えながら下書き保存できます。</p>
+      ) : (
+        <>
       <div className="chat-window">
         {messages.slice(-4).map((message) => (
           <div key={message.id} className={`chat-message ${message.role}`}>
@@ -359,6 +365,8 @@ function ChatDraftAssistant({
       <button className="ghost-button small" onClick={moveNext}>
         この質問をスキップ
       </button>
+        </>
+      )}
     </section>
   );
 }
