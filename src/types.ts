@@ -87,3 +87,41 @@ export type FieldGroup = {
 };
 
 export type OcrProvider = "openai" | "anthropic" | "gemini";
+
+export type AdminApplicationRow = {
+  id: string;
+  title: string;
+  year: string;
+  status: ApplicationStatus;
+  currentStep?: string;
+  createdBy?: string;
+  createdAt: number;
+  updatedAt: number;
+  submittedAt?: number;
+  errorCount: number;
+  warningCount: number;
+  ocrJobCount: number;
+  exportJobCount: number;
+};
+
+export type AdminAuditLog = {
+  id: string;
+  applicationId?: string;
+  actor?: string;
+  action: string;
+  detail?: string;
+  createdAt: number;
+};
+
+export type AdminDashboardData = {
+  generatedAt: number;
+  statusCounts: Record<string, number>;
+  ocrCounts: Record<string, number>;
+  exportCounts: Record<string, number>;
+  issueCounts: {
+    errors: number;
+    warnings: number;
+  };
+  applications: AdminApplicationRow[];
+  recentAuditLogs: AdminAuditLog[];
+};

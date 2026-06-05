@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AppIdentity } from "./auth/AuthShell";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
+import { AdminDashboard } from "./components/AdminDashboard";
 import { initialApplications, initialDetail } from "./lib/localSeed";
 import { buildLocalCsv, downloadText } from "./lib/download";
-import type { ApplicationDetail, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
+import type { AdminDashboardData, ApplicationDetail, ApplicationStatus, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
 import type { ValidationIssue } from "./types";
 
 type LocalDraftState = {
@@ -21,6 +22,7 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   const [details, setDetails] = useState<Record<string, ApplicationDetail>>(restored.details);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<"input" | "admin">("input");
   const detail = selectedId ? details[selectedId] ?? null : null;
 
   const valueMap = useMemo(() => new Map(detail?.values.map((item) => [item.fieldKey, item.value]) ?? []), [detail]);
@@ -43,7 +45,29 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
     setLastManualSaveAt(Date.now());
   };
 
+  const adminData = useMemo(() => buildLocalAdminData(applications, details), [applications, details]);
+
   return (
+    <>
+      <ViewSwitcher view={view} onChange={setView} />
+      {view === "admin" ? (
+        <AdminDashboard
+          mode="local"
+          identity={identity}
+          data={adminData}
+          onStatusChange={(applicationId, status) => {
+            setApplications((current) => current.map((item) => (item.id === applicationId ? { ...item, status, updatedAt: Date.now() } : item)));
+            setDetails((current) => {
+              const target = current[applicationId];
+              if (!target) return current;
+              return {
+                ...current,
+                [applicationId]: touch({ ...target, application: { ...target.application, status } }),
+              };
+            });
+          }}
+        />
+      ) : (
     <ApplicationWorkspace
       mode="local"
       identity={identity}
@@ -179,6 +203,8 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
         patchDetail((current) => touch({ ...current, application: { ...current.application, status: "exported" } }));
       }}
     />
+      )}
+    </>
   );
 }
 
@@ -212,4 +238,50 @@ function readLocalDrafts(): LocalDraftState {
 
 function writeLocalDrafts(state: LocalDraftState) {
   window.localStorage.setItem(localStorageKey, JSON.stringify(state));
+}
+
+function buildLocalAdminData(applications: AppRecord[], details: Record<string, ApplicationDetail>): AdminDashboardData {
+  const statusCounts: Record<string, number> = {};
+  for (const application of applications) statusCounts[application.status] = (statusCounts[application.status] ?? 0) + 1;
+  const allIssues = Object.values(details).flatMap((detail) => detail.issues);
+  return {
+    generatedAt: Date.now(),
+    statusCounts,
+    ocrCounts: {},
+    exportCounts: {},
+    issueCounts: {
+      errors: allIssues.filter((issue) => issue.severity === "error").length,
+      warnings: allIssues.filter((issue) => issue.severity !== "error").length,
+    },
+    applications: applications.map((application) => {
+      const detail = details[application.id];
+      return {
+        id: application.id,
+        title: application.title,
+        year: application.year,
+        status: application.status,
+        currentStep: "local",
+        createdAt: application.updatedAt,
+        updatedAt: application.updatedAt,
+        errorCount: detail?.issues.filter((issue) => issue.severity === "error").length ?? 0,
+        warningCount: detail?.issues.filter((issue) => issue.severity !== "error").length ?? 0,
+        ocrJobCount: detail?.ocrResults.length ? 1 : 0,
+        exportJobCount: application.status === "exported" ? 1 : 0,
+      };
+    }),
+    recentAuditLogs: [],
+  };
+}
+
+function ViewSwitcher({ view, onChange }: { view: "input" | "admin"; onChange: (view: "input" | "admin") => void }) {
+  return (
+    <div className="view-switcher">
+      <button className={view === "input" ? "active" : ""} onClick={() => onChange("input")}>
+        申請入力
+      </button>
+      <button className={view === "admin" ? "active" : ""} onClick={() => onChange("admin")}>
+        管理
+      </button>
+    </div>
+  );
 }

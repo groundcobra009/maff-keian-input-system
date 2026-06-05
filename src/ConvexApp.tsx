@@ -1,13 +1,15 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 import type { AppIdentity } from "./auth/AuthShell";
+import { AdminDashboard } from "./components/AdminDashboard";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
 import { downloadText } from "./lib/download";
 import { convexApi } from "./lib/convexRefs";
-import type { ApplicationDetail, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
+import type { AdminDashboardData, ApplicationDetail, ApplicationStatus, AppRecord, LandParcel, OcrProvider, PrimitiveValue } from "./types";
 
 export function ConvexApp({ identity }: { identity: AppIdentity }) {
   const rawApplications = useQuery(convexApi.applications.list) ?? [];
+  const rawAdminData = useQuery(convexApi.admin.dashboard);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const rawDetail = useQuery(convexApi.applications.get, selectedId ? { applicationId: selectedId } : "skip");
   const [busy, setBusy] = useState(false);
@@ -25,7 +27,9 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   const acceptOcr = useMutation(convexApi.ocr.acceptResult);
   const rejectOcr = useMutation(convexApi.ocr.rejectResult);
   const generateCsv = useAction(convexApi.export.generateCsv);
+  const setApplicationStatus = useMutation(convexApi.admin.setApplicationStatus);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
+  const [view, setView] = useState<"input" | "admin">("input");
 
   const applications = useMemo<AppRecord[]>(
     () =>
@@ -95,6 +99,18 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   }, [rawDetail]);
 
   return (
+    <>
+      <ViewSwitcher view={view} onChange={setView} />
+      {view === "admin" ? (
+        <AdminDashboard
+          mode="convex"
+          identity={identity}
+          data={(rawAdminData ?? emptyAdminData()) as AdminDashboardData}
+          onStatusChange={async (applicationId: string, status: ApplicationStatus) => {
+            await setApplicationStatus({ applicationId, status, actor: identity.email ?? identity.displayName });
+          }}
+        />
+      ) : (
     <ApplicationWorkspace
       mode="convex"
       identity={identity}
@@ -189,5 +205,32 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
         downloadText(result.fileName, result.content);
       }}
     />
+      )}
+    </>
+  );
+}
+
+function emptyAdminData(): AdminDashboardData {
+  return {
+    generatedAt: Date.now(),
+    statusCounts: {},
+    ocrCounts: {},
+    exportCounts: {},
+    issueCounts: { errors: 0, warnings: 0 },
+    applications: [],
+    recentAuditLogs: [],
+  };
+}
+
+function ViewSwitcher({ view, onChange }: { view: "input" | "admin"; onChange: (view: "input" | "admin") => void }) {
+  return (
+    <div className="view-switcher">
+      <button className={view === "input" ? "active" : ""} onClick={() => onChange("input")}>
+        申請入力
+      </button>
+      <button className={view === "admin" ? "active" : ""} onClick={() => onChange("admin")}>
+        管理
+      </button>
+    </div>
   );
 }

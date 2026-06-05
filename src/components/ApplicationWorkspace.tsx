@@ -2,6 +2,7 @@ import {
   AlertCircle,
   Check,
   ChevronRight,
+  BotMessageSquare,
   Download,
   FileJson,
   FileText,
@@ -181,6 +182,8 @@ export function ApplicationWorkspace(props: Props) {
         </section>
 
         <aside className="right-panel">
+          <ChatDraftAssistant valueMap={valueMap} onSave={props.onSaveField} />
+
           <section className="tool-block">
             <div className="tool-heading">
               <Sparkles size={18} />
@@ -265,6 +268,106 @@ export function ApplicationWorkspace(props: Props) {
       </main>
     </div>
   );
+}
+
+type ChatMessage = {
+  id: string;
+  role: "assistant" | "user";
+  text: string;
+};
+
+function ChatDraftAssistant({
+  valueMap,
+  onSave,
+}: {
+  valueMap: Map<string, PrimitiveValue>;
+  onSave: (fieldKey: string, value: PrimitiveValue) => Promise<void> | void;
+}) {
+  const fields = useMemo(() => fieldGroups.flatMap((group) => group.fields), []);
+  const firstMissing = useMemo(() => fields.find((field) => field.required && !valueMap.get(field.key)) ?? fields.find((field) => !valueMap.get(field.key)), [fields, valueMap]);
+  const [activeFieldKey, setActiveFieldKey] = useState(firstMissing?.key ?? fields[0]?.key);
+  const activeField = fields.find((field) => field.key === activeFieldKey) ?? firstMissing ?? fields[0];
+  const [answer, setAnswer] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: "initial",
+      role: "assistant",
+      text: "未入力項目を順番に質問します。回答は下書きとして保存されます。",
+    },
+  ]);
+
+  const askText = activeField ? questionFor(activeField) : "入力項目はありません。";
+
+  const moveNext = () => {
+    const next = fields.find((field) => field.key !== activeField?.key && !valueMap.get(field.key));
+    if (next) setActiveFieldKey(next.key);
+  };
+
+  const submitAnswer = async (value: PrimitiveValue) => {
+    if (!activeField || value === null || value === "") return;
+    await onSave(activeField.key, value);
+    setMessages((current) => [
+      ...current,
+      { id: crypto.randomUUID(), role: "assistant", text: askText },
+      { id: crypto.randomUUID(), role: "user", text: String(value) },
+      { id: crypto.randomUUID(), role: "assistant", text: `${activeField.label} を下書きに保存しました。` },
+    ]);
+    setAnswer("");
+    moveNext();
+  };
+
+  return (
+    <section className="tool-block chat-block">
+      <div className="tool-heading">
+        <BotMessageSquare size={18} />
+        <h2>質問で下書き入力</h2>
+      </div>
+      <div className="chat-window">
+        {messages.slice(-4).map((message) => (
+          <div key={message.id} className={`chat-message ${message.role}`}>
+            {message.text}
+          </div>
+        ))}
+        <div className="chat-message assistant">{askText}</div>
+      </div>
+      {activeField?.type === "select" ? (
+        <div className="choice-list">
+          {activeField.options?.map((option) => (
+            <button key={option.value} className="ghost-button small" onClick={() => submitAnswer(option.value)}>
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="chat-input-row">
+          <input
+            type={activeField?.type === "number" ? "number" : "text"}
+            value={answer}
+            placeholder="回答を入力"
+            onChange={(event) => setAnswer(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                submitAnswer(activeField?.type === "number" ? numberOrNull(answer) : answer);
+              }
+            }}
+          />
+          <button className="primary-button small" onClick={() => submitAnswer(activeField?.type === "number" ? numberOrNull(answer) : answer)}>
+            保存
+          </button>
+        </div>
+      )}
+      <button className="ghost-button small" onClick={moveNext}>
+        この質問をスキップ
+      </button>
+    </section>
+  );
+}
+
+function questionFor(field: FieldDefinition) {
+  const required = field.required ? "必須項目です。" : "任意項目です。";
+  if (field.type === "select") return `${field.label} を選んでください。${required}`;
+  if (field.unit) return `${field.label} を入力してください。単位は ${field.unit} です。${required}`;
+  return `${field.label} を入力してください。${required}`;
 }
 
 function FormSection({

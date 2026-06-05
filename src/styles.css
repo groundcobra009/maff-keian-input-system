@@ -71,6 +71,33 @@ button:focus-visible {
   flex-direction: column;
 }
 
+.view-switcher {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #fbfaf7;
+  border-bottom: 1px solid var(--line);
+}
+
+.view-switcher button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  padding: 6px 12px;
+  font-weight: 700;
+}
+
+.view-switcher button.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -434,6 +461,48 @@ button:focus-visible {
   gap: 12px;
 }
 
+.chat-block {
+  background: #fdfbf5;
+}
+
+.chat-window {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.chat-message {
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 12px;
+}
+
+.chat-message.assistant {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.chat-message.user {
+  background: var(--green-soft);
+  color: var(--green);
+  justify-self: end;
+  max-width: 88%;
+}
+
+.chat-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .tool-heading {
   justify-content: space-between;
 }
@@ -607,6 +676,149 @@ button:focus-visible {
   color: var(--muted);
 }
 
+.admin-layout {
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-card,
+.admin-section {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.metric-card {
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.metric-card > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metric-card strong {
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.metric-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.metric-card.danger strong,
+.danger-text {
+  color: var(--red);
+}
+
+.admin-section {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.admin-section-heading h2,
+.admin-section-heading p {
+  margin: 0;
+}
+
+.admin-section-heading h2 {
+  font-size: 18px;
+}
+
+.admin-section-heading p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-search {
+  width: min(100%, 340px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+}
+
+.admin-search input {
+  border: 0;
+  padding-left: 0;
+}
+
+.admin-table {
+  display: grid;
+  min-width: 880px;
+  overflow-x: auto;
+}
+
+.admin-table-head,
+.admin-table-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.6fr) 80px 150px 150px 70px 70px 110px;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.admin-table-head {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-table-row {
+  font-size: 13px;
+}
+
+.admin-table-row select {
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+.audit-list {
+  display: grid;
+  gap: 6px;
+}
+
+.audit-row {
+  display: grid;
+  grid-template-columns: 120px minmax(160px, 1fr) minmax(120px, 1fr) minmax(100px, 0.7fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.audit-row span {
+  color: var(--muted);
+}
+
 .empty-state h2 {
   margin: 0;
   color: var(--ink);
@@ -631,7 +843,11 @@ button:focus-visible {
     grid-column: 1 / -1;
     border-left: 0;
     border-top: 1px solid var(--line);
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -669,5 +885,14 @@ button:focus-visible {
 
   .parcel-table {
     overflow-x: auto;
+  }
+
+  .metric-grid,
+  .right-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-section-heading {
+    flex-direction: column;
   }
 }
