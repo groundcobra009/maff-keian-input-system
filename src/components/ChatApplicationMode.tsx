@@ -27,6 +27,11 @@ type DirectFieldSave = {
   value: PrimitiveValue;
 };
 
+type AssistantRequestOptions = {
+  hiddenUserText?: boolean;
+  draftOnly?: boolean;
+};
+
 type Props = {
   mode: "local" | "convex";
   identity: AppIdentity;
@@ -63,13 +68,14 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
   const nextField = allFields.find((field) => field.key === nextFieldKey);
   const choiceField = nextField?.type === "select" && nextField.options?.length ? nextField : null;
 
-  const sendToAssistant = async (text: string, directSave?: DirectFieldSave) => {
+  const sendToAssistant = async (text: string, directSave?: DirectFieldSave, options: AssistantRequestOptions = {}) => {
     if (!detail || busy) return;
     const trimmed = text.trim();
     if (!trimmed) return;
 
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", text: trimmed };
-    const nextMessages = [...messages, userMessage];
+    const nextMessages = options.hiddenUserText ? messages : [...messages, userMessage];
+    const requestMessages = options.hiddenUserText ? [...messages, userMessage] : nextMessages;
     const currentFields = allFields
       .filter((field) => valueMap.has(field.key))
       .map((field) => ({ fieldKey: field.key, label: field.label, value: valueMap.get(field.key) }));
@@ -94,7 +100,7 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
             authMode: identity.authMode,
           },
           currentFields: requestFields,
-          messages: nextMessages.map((message) => ({ role: message.role, text: message.text })),
+          messages: requestMessages.map((message) => ({ role: message.role, text: message.text })),
         }),
       });
       const result = await response.json();
@@ -106,12 +112,19 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
       setLastSavedFields(savedFields);
       const resultNextFieldKey = typeof result.nextFieldKey === "string" && !skippedFieldKeys.includes(result.nextFieldKey) ? result.nextFieldKey : null;
       setNextFieldKey(resultNextFieldKey ?? nextUnfilledFieldKey(requestFields, savedFields, skippedFieldKeys));
+      const assistantText = options.draftOnly
+        ? savedFields.length > 0
+          ? "ここまでの内容を下書きに反映しました。続ける場合は次の回答を入力してください。"
+          : "ここまでの内容はすでに下書きへ反映済みです。分からない項目は空欄のまま進められます。"
+        : typeof result.reply === "string" && result.reply
+          ? result.reply
+          : fallbackQuestion(valueMap, skippedFieldKeys);
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: typeof result.reply === "string" && result.reply ? result.reply : fallbackQuestion(valueMap, skippedFieldKeys),
+          text: assistantText,
           savedCount: savedFields.length,
         },
       ]);
@@ -121,7 +134,9 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: `${fallbackQuestion(valueMap, skippedFieldKeys)} AI応答に失敗したため、次の確認だけ進めます。`,
+          text: options.draftOnly
+            ? "下書き作成に失敗しました。入力を続けるか、もう一度試してください。"
+            : `${fallbackQuestion(valueMap, skippedFieldKeys)} AI応答に失敗したため、次の確認だけ進めます。`,
         },
       ]);
     } finally {
@@ -180,7 +195,11 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
   };
 
   const createDraftFromChat = () => {
-    void sendToAssistant("ここまでの会話内容で申請書の下書きを作成してください。未入力の重要項目があれば次の質問を1つだけ出してください。");
+    void sendToAssistant(
+      "ここまでの会話内容から、新しく下書き保存できる申請項目だけを抽出してください。質問は返さないでください。",
+      undefined,
+      { hiddenUserText: true, draftOnly: true },
+    );
   };
 
   const createDraft = async () => {
