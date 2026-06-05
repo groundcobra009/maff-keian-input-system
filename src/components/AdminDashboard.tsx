@@ -1,4 +1,4 @@
-import { Activity, AlertCircle, Database, FileDown, Search, ShieldCheck } from "lucide-react";
+import { Activity, AlertCircle, Clock3, Database, FileCheck2, FileDown, ListChecks, Search, ShieldCheck, ScanText } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { statusLabels } from "../data/formDefinition";
@@ -40,6 +40,25 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
 
   const total = data.applications.length;
   const submitted = (data.statusCounts.submitted ?? 0) + (data.statusCounts.accepted ?? 0) + (data.statusCounts.exported ?? 0);
+  const now = Date.now();
+  const statusSegments = statusOptions
+    .map((status) => ({ status, label: statusLabels[status], count: data.statusCounts[status] ?? 0 }))
+    .filter((segment) => segment.count > 0);
+  const issueDashboard = {
+    errorApplications: data.applications.filter((application) => application.errorCount > 0).length,
+    warningApplications: data.applications.filter((application) => application.warningCount > 0 && application.errorCount === 0).length,
+    cleanApplications: data.applications.filter((application) => application.errorCount === 0 && application.warningCount === 0).length,
+  };
+  const ocrTotal = Object.values(data.ocrCounts).reduce((sum, value) => sum + value, 0);
+  const exportTotal = Object.values(data.exportCounts).reduce((sum, value) => sum + value, 0);
+  const recentlyUpdated = data.applications.filter((application) => now - application.updatedAt <= 1000 * 60 * 60 * 2).length;
+  const staleDrafts = data.applications.filter(
+    (application) => ["draft", "ocr_draft", "needs_review", "returned"].includes(application.status) && now - application.updatedAt >= 1000 * 60 * 60 * 24,
+  ).length;
+  const actionQueue = data.applications
+    .filter((application) => application.errorCount > 0 || application.warningCount > 0 || application.status === "returned")
+    .sort((a, b) => b.errorCount - a.errorCount || b.warningCount - a.warningCount || b.updatedAt - a.updatedAt)
+    .slice(0, 5);
 
   return (
     <div className="app-shell">
@@ -66,6 +85,111 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
           <Metric title="提出以降" value={submitted} note="提出・受付・出力済み" icon={<ShieldCheck size={18} />} />
           <Metric title="検証エラー" value={data.issueCounts.errors} note="全申請の未解消エラー" icon={<AlertCircle size={18} />} tone="danger" />
           <Metric title="CSV出力" value={Object.values(data.exportCounts).reduce((sum, value) => sum + value, 0)} note="出力ジョブ数" icon={<FileDown size={18} />} />
+        </section>
+
+        <section className="dashboard-grid">
+          <div className="dashboard-card dashboard-card-wide">
+            <div className="dashboard-card-heading">
+              <div>
+                <ListChecks size={18} />
+                <h2>申請ステータス</h2>
+              </div>
+              <span>{total}件</span>
+            </div>
+            <div className="status-distribution" aria-label="状態別件数">
+              {statusSegments.map((segment) => (
+                <span
+                  key={segment.status}
+                  className={`status-segment ${segment.status}`}
+                  style={{ width: `${Math.max(5, (segment.count / Math.max(total, 1)) * 100)}%` }}
+                  title={`${segment.label}: ${segment.count}件`}
+                />
+              ))}
+            </div>
+            <div className="status-legend">
+              {statusSegments.map((segment) => (
+                <div key={segment.status}>
+                  <i className={`status-dot ${segment.status}`} />
+                  <span>{segment.label}</span>
+                  <strong>{segment.count}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="dashboard-card">
+            <div className="dashboard-card-heading">
+              <div>
+                <AlertCircle size={18} />
+                <h2>対応優先度</h2>
+              </div>
+            </div>
+            <div className="priority-stack">
+              <PriorityRow label="エラーあり" value={issueDashboard.errorApplications} tone="danger" total={total} />
+              <PriorityRow label="確認あり" value={issueDashboard.warningApplications} tone="warning" total={total} />
+              <PriorityRow label="問題なし" value={issueDashboard.cleanApplications} tone="ok" total={total} />
+            </div>
+          </div>
+
+          <div className="dashboard-card">
+            <div className="dashboard-card-heading">
+              <div>
+                <ScanText size={18} />
+                <h2>AI / OCR</h2>
+              </div>
+              <span>{ocrTotal}件</span>
+            </div>
+            <JobSummary counts={data.ocrCounts} emptyLabel="OCRジョブなし" />
+          </div>
+
+          <div className="dashboard-card">
+            <div className="dashboard-card-heading">
+              <div>
+                <FileCheck2 size={18} />
+                <h2>CSV出力</h2>
+              </div>
+              <span>{exportTotal}件</span>
+            </div>
+            <JobSummary counts={data.exportCounts} emptyLabel="CSV出力なし" />
+          </div>
+
+          <div className="dashboard-card dashboard-card-wide">
+            <div className="dashboard-card-heading">
+              <div>
+                <Clock3 size={18} />
+                <h2>運用キュー</h2>
+              </div>
+              <span>直近2時間 {recentlyUpdated}件</span>
+            </div>
+            <div className="queue-summary">
+              <div>
+                <strong>{actionQueue.length}</strong>
+                <span>対応候補</span>
+              </div>
+              <div>
+                <strong>{staleDrafts}</strong>
+                <span>24時間以上停滞</span>
+              </div>
+              <div>
+                <strong>{submitted}</strong>
+                <span>提出以降</span>
+              </div>
+            </div>
+            <div className="action-queue">
+              {actionQueue.length ? (
+                actionQueue.map((application) => (
+                  <div key={application.id}>
+                    <strong>{application.title}</strong>
+                    <span>
+                      {statusLabels[application.status]} · {application.errorCount} エラー / {application.warningCount} 確認
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="subtle">優先対応が必要な申請はありません。</p>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="admin-section">
@@ -142,6 +266,46 @@ export function AdminDashboard({ mode, identity, data, notice, statusReadOnly, o
       </main>
     </div>
   );
+}
+
+function PriorityRow({ label, value, tone, total }: { label: string; value: number; tone: "danger" | "warning" | "ok"; total: number }) {
+  const percent = Math.round((value / Math.max(total, 1)) * 100);
+  return (
+    <div className={`priority-row ${tone}`}>
+      <div>
+        <span>{label}</span>
+        <strong>{value}件</strong>
+      </div>
+      <div className="priority-bar">
+        <span style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function JobSummary({ counts, emptyLabel }: { counts: Record<string, number>; emptyLabel: string }) {
+  const entries = Object.entries(counts).filter(([, value]) => value > 0);
+  if (!entries.length) return <p className="subtle">{emptyLabel}</p>;
+  return (
+    <div className="job-summary">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <span>{jobLabel(key)}</span>
+          <strong>{value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function jobLabel(value: string) {
+  const labels: Record<string, string> = {
+    queued: "待機中",
+    running: "実行中",
+    succeeded: "成功",
+    failed: "失敗",
+  };
+  return labels[value] ?? value;
 }
 
 function Metric({
