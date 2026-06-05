@@ -110,15 +110,25 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
       }
       const savedFields = directSave ? [directSave, ...fields.filter((field) => field.fieldKey !== directSave.fieldKey)] : fields;
       setLastSavedFields(savedFields);
-      const resultNextFieldKey = typeof result.nextFieldKey === "string" && !skippedFieldKeys.includes(result.nextFieldKey) ? result.nextFieldKey : null;
-      setNextFieldKey(resultNextFieldKey ?? nextUnfilledFieldKey(requestFields, savedFields, skippedFieldKeys));
+      const filledAfterSave = mergeFieldEntries(requestFields, savedFields);
+      const computedNextFieldKey = nextUnfilledFieldKey(filledAfterSave, [], skippedFieldKeys);
+      const resultNextFieldKey =
+        typeof result.nextFieldKey === "string" && !skippedFieldKeys.includes(result.nextFieldKey) && !filledAfterSave.some((field) => field.fieldKey === result.nextFieldKey)
+          ? result.nextFieldKey
+          : null;
+      const finalNextFieldKey = resultNextFieldKey ?? computedNextFieldKey;
+      setNextFieldKey(finalNextFieldKey);
+      const resultReply = typeof result.reply === "string" ? result.reply.trim() : "";
+      const repeatedSavedQuestion = savedFields.some((field) => isSameQuestion(resultReply, field.fieldKey));
       const assistantText = options.draftOnly
         ? savedFields.length > 0
           ? "ここまでの内容を下書きに反映しました。続ける場合は次の回答を入力してください。"
           : "ここまでの内容はすでに下書きへ反映済みです。分からない項目は空欄のまま進められます。"
-        : typeof result.reply === "string" && result.reply
-          ? result.reply
-          : fallbackQuestion(valueMap, skippedFieldKeys);
+        : resultReply && !repeatedSavedQuestion
+          ? resultReply
+          : finalNextFieldKey
+            ? questionForFieldKey(finalNextFieldKey)
+            : "主要項目は埋まりました。追加で伝えたい内容があれば教えてください。";
       setMessages((current) => [
         ...current,
         {
@@ -160,6 +170,14 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
       });
       return;
     }
+    if (nextField && nextField.type !== "select") {
+      void sendToAssistant(trimmed, {
+        fieldKey: nextField.key,
+        label: nextField.label,
+        value: coerceDirectAnswer(trimmed, nextField),
+      });
+      return;
+    }
     void sendToAssistant(trimmed);
   };
 
@@ -192,6 +210,11 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
           : "分からない項目は空欄のままにしました。主要項目は一通り確認しました。",
       },
     ]);
+  };
+
+  const goToNextQuestion = () => {
+    if (!nextFieldKey || busy) return;
+    skipCurrentField("次の質問へ");
   };
 
   const createDraftFromChat = () => {
@@ -245,7 +268,7 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
                   {selectedId?.startsWith("optimistic-") ? <p className="admin-notice">Convex同期待ちの一時下書きです。</p> : null}
                 </div>
                 <div className="chat-draft-actions">
-                  <button className="ghost-button" onClick={() => sendToAssistant("次の質問をお願いします。")} disabled={busy}>
+                  <button className="ghost-button" onClick={goToNextQuestion} disabled={busy}>
                     <BotMessageSquare size={18} />
                     次の質問
                   </button>
@@ -385,6 +408,19 @@ function nextUnfilledFieldKey(currentFields: Array<{ fieldKey: string }>, savedF
   return allFields.find((field) => field.required && !filledKeys.has(field.key) && !skipped.has(field.key))?.key ?? allFields.find((field) => !filledKeys.has(field.key) && !skipped.has(field.key))?.key ?? null;
 }
 
+function mergeFieldEntries(currentFields: Array<{ fieldKey: string }>, savedFields: Array<{ fieldKey: string }>) {
+  const entries = new Map<string, { fieldKey: string }>();
+  for (const field of currentFields) entries.set(field.fieldKey, field);
+  for (const field of savedFields) entries.set(field.fieldKey, field);
+  return Array.from(entries.values());
+}
+
+function coerceDirectAnswer(value: string, field: FieldDefinition): PrimitiveValue {
+  if (field.type !== "number") return value;
+  const numeric = Number(value.replace(/,/g, ""));
+  return Number.isFinite(numeric) ? numeric : value;
+}
+
 function choiceText(label: string, index: number) {
   return `${index + 1} ${label.replace("あり / ", "").replace("なし / ", "")}`;
 }
@@ -403,6 +439,15 @@ function choiceFromInput(input: string, field: FieldDefinition) {
 function questionForFieldKey(fieldKey: string) {
   const field = allFields.find((item) => item.key === fieldKey);
   return field ? `${field.label}を教えてください。` : "次の項目を教えてください。";
+}
+
+function isSameQuestion(text: string, fieldKey: string) {
+  const normalizedText = normalizeQuestionText(text);
+  return normalizedText === normalizeQuestionText(questionForFieldKey(fieldKey));
+}
+
+function normalizeQuestionText(text: string) {
+  return text.replace(/\s/g, "").replace(/[?？]/g, "。").replace(/。+$/g, "。");
 }
 
 function isUnknownAnswer(value: string) {
