@@ -53,6 +53,7 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
   const [createError, setCreateError] = useState<string | null>(null);
   const [lastSavedFields, setLastSavedFields] = useState<DraftField[]>([]);
   const [nextFieldKey, setNextFieldKey] = useState<string | null>("applicant.nameKanji");
+  const [skippedFieldKeys, setSkippedFieldKeys] = useState<string[]>([]);
 
   const valueMap = useMemo(() => new Map(detail?.values.map((item) => [item.fieldKey, item.value]) ?? []), [detail]);
   const filledCount = detail?.values.length ?? 0;
@@ -103,13 +104,14 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
       }
       const savedFields = directSave ? [directSave, ...fields.filter((field) => field.fieldKey !== directSave.fieldKey)] : fields;
       setLastSavedFields(savedFields);
-      setNextFieldKey(typeof result.nextFieldKey === "string" ? result.nextFieldKey : nextUnfilledFieldKey(requestFields, savedFields));
+      const resultNextFieldKey = typeof result.nextFieldKey === "string" && !skippedFieldKeys.includes(result.nextFieldKey) ? result.nextFieldKey : null;
+      setNextFieldKey(resultNextFieldKey ?? nextUnfilledFieldKey(requestFields, savedFields, skippedFieldKeys));
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: typeof result.reply === "string" && result.reply ? result.reply : fallbackQuestion(valueMap),
+          text: typeof result.reply === "string" && result.reply ? result.reply : fallbackQuestion(valueMap, skippedFieldKeys),
           savedCount: savedFields.length,
         },
       ]);
@@ -119,7 +121,7 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: `${fallbackQuestion(valueMap)} AI応答に失敗したため、次の確認だけ進めます。`,
+          text: `${fallbackQuestion(valueMap, skippedFieldKeys)} AI応答に失敗したため、次の確認だけ進めます。`,
         },
       ]);
     } finally {
@@ -130,6 +132,10 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
   const submitFreeText = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
+    if (isUnknownAnswer(trimmed) && nextFieldKey) {
+      skipCurrentField(trimmed);
+      return;
+    }
     const selectedChoice = choiceField ? choiceFromInput(trimmed, choiceField) : null;
     if (choiceField && selectedChoice) {
       void sendToAssistant(selectedChoice.text, {
@@ -150,6 +156,27 @@ export function ChatApplicationMode({ mode, identity, detail, selectedId, onCrea
       label: field.label,
       value: option.value,
     });
+  };
+
+  const skipCurrentField = (text: string) => {
+    if (!nextFieldKey) return;
+    const skipped = Array.from(new Set([...skippedFieldKeys, nextFieldKey]));
+    const currentFields = allFields.filter((field) => valueMap.has(field.key)).map((field) => ({ fieldKey: field.key }));
+    const nextKey = nextUnfilledFieldKey(currentFields, [], skipped);
+    setSkippedFieldKeys(skipped);
+    setNextFieldKey(nextKey);
+    setInput("");
+    setMessages((current) => [
+      ...current,
+      { id: crypto.randomUUID(), role: "user", text },
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        text: nextKey
+          ? `分からない項目は空欄のまま進めます。${questionForFieldKey(nextKey)}`
+          : "分からない項目は空欄のままにしました。主要項目は一通り確認しました。",
+      },
+    ]);
   };
 
   const createDraftFromChat = () => {
@@ -327,14 +354,16 @@ function normalizeDraftFields(fields: unknown): DraftField[] {
     .slice(0, 8);
 }
 
-function fallbackQuestion(valueMap: Map<string, PrimitiveValue>) {
-  const next = allFields.find((field) => field.required && !valueMap.has(field.key)) ?? allFields.find((field) => !valueMap.has(field.key));
+function fallbackQuestion(valueMap: Map<string, PrimitiveValue>, skippedFieldKeys: string[] = []) {
+  const skipped = new Set(skippedFieldKeys);
+  const next = allFields.find((field) => field.required && !valueMap.has(field.key) && !skipped.has(field.key)) ?? allFields.find((field) => !valueMap.has(field.key) && !skipped.has(field.key));
   return next ? `${next.label}を教えてください。` : "主要項目は埋まりました。追加で伝えたい内容があれば教えてください。";
 }
 
-function nextUnfilledFieldKey(currentFields: Array<{ fieldKey: string }>, savedFields: Array<{ fieldKey: string }>) {
+function nextUnfilledFieldKey(currentFields: Array<{ fieldKey: string }>, savedFields: Array<{ fieldKey: string }>, skippedFieldKeys: string[] = []) {
   const filledKeys = new Set([...currentFields.map((field) => field.fieldKey), ...savedFields.map((field) => field.fieldKey)]);
-  return allFields.find((field) => field.required && !filledKeys.has(field.key))?.key ?? allFields.find((field) => !filledKeys.has(field.key))?.key ?? null;
+  const skipped = new Set(skippedFieldKeys);
+  return allFields.find((field) => field.required && !filledKeys.has(field.key) && !skipped.has(field.key))?.key ?? allFields.find((field) => !filledKeys.has(field.key) && !skipped.has(field.key))?.key ?? null;
 }
 
 function choiceText(label: string, index: number) {
@@ -350,6 +379,17 @@ function choiceFromInput(input: string, field: FieldDefinition) {
     text: choiceText(option.label, index),
     value: option.value,
   };
+}
+
+function questionForFieldKey(fieldKey: string) {
+  const field = allFields.find((item) => item.key === fieldKey);
+  return field ? `${field.label}を教えてください。` : "次の項目を教えてください。";
+}
+
+function isUnknownAnswer(value: string) {
+  const normalized = value.replace(/\s/g, "").toLowerCase();
+  if (["unknown", "idk", "n/a", "na", "-"].includes(normalized)) return true;
+  return /不明|わからな|分からな|分かりません|わかりません|わかんない|分かんない|不詳|不確定|未定|知らない|確認中|あとで|後で|空欄/.test(normalized);
 }
 
 function formatPrimitive(value: PrimitiveValue | undefined) {
