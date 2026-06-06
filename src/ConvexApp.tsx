@@ -5,6 +5,7 @@ import { isAdminIdentity } from "./auth/permissions";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
 import { ChatApplicationMode } from "./components/ChatApplicationMode";
+import { FeedbackPanel } from "./components/FeedbackPanel";
 import { buildDemoAdminData } from "./lib/demoDashboardData";
 import { downloadText } from "./lib/download";
 import { convexApi } from "./lib/convexRefs";
@@ -37,6 +38,7 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   const saveCouncilSettings = useMutation(convexApi.admin.saveCouncilSettings);
   const addAdminUser = useMutation(convexApi.admin.addAdminUser);
   const removeAdminUser = useMutation(convexApi.admin.removeAdminUser);
+  const submitFeedback = useMutation(convexApi.feedback.submit);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
   const [view, setView] = useState<AppView>("input");
   const demoAdminData = useMemo(() => buildDemoAdminData(30), []);
@@ -174,6 +176,17 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
   return (
     <>
       <ViewSwitcher view={view} canUseAdmin={canUseAdmin} onChange={setView} />
+      <FeedbackPanel
+        identity={identity}
+        view={viewLabel(view)}
+        onSubmit={async (feedback) => {
+          await submitFeedback({
+            ...feedback,
+            email: identity.email,
+            createdBy: identity.email ?? identity.displayName,
+          });
+        }}
+      />
       {view === "admin" && canUseAdmin ? (
         <AdminDashboard
           mode="convex"
@@ -294,6 +307,15 @@ export function ConvexApp({ identity }: { identity: AppIdentity }) {
 }
 
 type AppView = "input" | "chat" | "admin";
+
+function viewLabel(view: AppView) {
+  const labels: Record<AppView, string> = {
+    input: "申請入力",
+    chat: "チャット申請",
+    admin: "管理",
+  };
+  return labels[view];
+}
 
 function ViewSwitcher({ view, canUseAdmin, onChange }: { view: AppView; canUseAdmin: boolean; onChange: (view: AppView) => void }) {
   return (

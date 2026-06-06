@@ -27,7 +27,7 @@ const settingsScope = "default";
 export const dashboard = query({
   args: {},
   handler: async (ctx) => {
-    const [applications, ocrJobs, exportJobs, issues, auditLogs, adminUsers, councilSettings] = await Promise.all([
+    const [applications, ocrJobs, exportJobs, issues, auditLogs, adminUsers, councilSettings, feedbackItems] = await Promise.all([
       ctx.db.query("applications").order("desc").take(200),
       ctx.db.query("ocrJobs").order("desc").take(200),
       ctx.db.query("exportJobs").order("desc").take(200),
@@ -38,6 +38,7 @@ export const dashboard = query({
         .query("councilSettings")
         .withIndex("by_scope", (q) => q.eq("scope", settingsScope))
         .unique(),
+      ctx.db.query("feedbackItems").order("desc").take(100),
     ]);
 
     const issueCountByApplication = new Map<string, { errors: number; warnings: number }>();
@@ -179,6 +180,16 @@ export const dashboard = query({
         role: user.role,
         addedAt: user.addedAt,
         addedBy: user.addedBy,
+      })),
+      feedbackItems: feedbackItems.map((feedback) => ({
+        id: feedback._id,
+        name: feedback.name,
+        email: feedback.email,
+        message: feedback.message,
+        view: feedback.view,
+        status: feedback.status,
+        createdAt: feedback.createdAt,
+        createdBy: feedback.createdBy,
       })),
     };
   },

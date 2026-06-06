@@ -133,6 +133,17 @@ export type AdminUser = {
   addedBy?: string;
 };
 
+export type FeedbackItem = {
+  id: string;
+  name: string;
+  email?: string;
+  message: string;
+  view?: string;
+  status: "new" | "reviewing" | "done" | "archived";
+  createdAt: number;
+  createdBy?: string;
+};
+
 export type AdminDashboardData = {
   generatedAt: number;
   statusCounts: Record<string, number>;
@@ -154,6 +165,7 @@ export type AdminDashboardData = {
   }>;
   councilSettings?: CouncilSettings | null;
   adminUsers?: AdminUser[];
+  feedbackItems?: FeedbackItem[];
   applications: AdminApplicationRow[];
   recentAuditLogs: AdminAuditLog[];
 };

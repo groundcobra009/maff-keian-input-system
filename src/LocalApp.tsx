@@ -4,9 +4,10 @@ import { isAdminIdentity } from "./auth/permissions";
 import { ApplicationWorkspace } from "./components/ApplicationWorkspace";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { ChatApplicationMode } from "./components/ChatApplicationMode";
+import { FeedbackPanel } from "./components/FeedbackPanel";
 import { initialApplications, initialDetail } from "./lib/localSeed";
 import { buildLocalCsv, downloadText } from "./lib/download";
-import type { AdminDashboardData, AdminUser, ApplicationDetail, ApplicationStatus, AppRecord, CouncilSettings, LandParcel, OcrProvider, PrimitiveValue } from "./types";
+import type { AdminDashboardData, AdminUser, ApplicationDetail, ApplicationStatus, AppRecord, CouncilSettings, FeedbackItem, LandParcel, OcrProvider, PrimitiveValue } from "./types";
 import type { ValidationIssue } from "./types";
 
 type LocalDraftState = {
@@ -15,6 +16,7 @@ type LocalDraftState = {
   details: Record<string, ApplicationDetail>;
   councilSettings?: CouncilSettings;
   adminUsers?: AdminUser[];
+  feedbackItems?: FeedbackItem[];
 };
 
 const localStorageKey = "maff-keian-local-drafts";
@@ -34,6 +36,7 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   const [details, setDetails] = useState<Record<string, ApplicationDetail>>(restored.details);
   const [councilSettings, setCouncilSettings] = useState<CouncilSettings>(restored.councilSettings ?? {});
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(restored.adminUsers ?? []);
+  const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>(restored.feedbackItems ?? []);
   const [lastManualSaveAt, setLastManualSaveAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<AppView>("input");
@@ -52,19 +55,22 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   };
 
   useEffect(() => {
-    writeLocalDrafts({ applications, selectedId, details, councilSettings, adminUsers });
-  }, [adminUsers, applications, councilSettings, selectedId, details]);
+    writeLocalDrafts({ applications, selectedId, details, councilSettings, adminUsers, feedbackItems });
+  }, [adminUsers, applications, councilSettings, feedbackItems, selectedId, details]);
 
   useEffect(() => {
     if (!canUseAdmin && view === "admin") setView("input");
   }, [canUseAdmin, view]);
 
   const manualSave = () => {
-    writeLocalDrafts({ applications, selectedId, details, councilSettings, adminUsers });
+    writeLocalDrafts({ applications, selectedId, details, councilSettings, adminUsers, feedbackItems });
     setLastManualSaveAt(Date.now());
   };
 
-  const adminData = useMemo(() => buildLocalAdminData(applications, details, councilSettings, adminUsers), [adminUsers, applications, councilSettings, details]);
+  const adminData = useMemo(
+    () => buildLocalAdminData(applications, details, councilSettings, adminUsers, feedbackItems),
+    [adminUsers, applications, councilSettings, details, feedbackItems],
+  );
 
   const createDraft = () => {
     const id = crypto.randomUUID();
@@ -96,6 +102,25 @@ export function LocalApp({ identity }: { identity: AppIdentity }) {
   return (
     <>
       <ViewSwitcher view={view} canUseAdmin={canUseAdmin} onChange={setView} />
+      <FeedbackPanel
+        identity={identity}
+        view={viewLabel(view)}
+        onSubmit={(feedback) => {
+          setFeedbackItems((current) => [
+            {
+              id: crypto.randomUUID(),
+              name: feedback.name,
+              message: feedback.message,
+              view: feedback.view,
+              email: identity.email,
+              createdBy: identity.email ?? identity.displayName,
+              status: "new",
+              createdAt: Date.now(),
+            },
+            ...current,
+          ]);
+        }}
+      />
       {view === "admin" && canUseAdmin ? (
         <AdminDashboard
           mode="local"
@@ -299,6 +324,7 @@ function buildLocalAdminData(
   details: Record<string, ApplicationDetail>,
   councilSettings: CouncilSettings,
   adminUsers: AdminUser[],
+  feedbackItems: FeedbackItem[],
 ): AdminDashboardData {
   const statusCounts: Record<string, number> = {};
   for (const application of applications) statusCounts[application.status] = (statusCounts[application.status] ?? 0) + 1;
@@ -332,6 +358,7 @@ function buildLocalAdminData(
     subsidyCounts,
     councilSettings,
     adminUsers,
+    feedbackItems,
     applications: applications.map((application) => {
       const detail = details[application.id];
       const totalAreaM2 = detail?.parcels.reduce((sum, parcel) => sum + (parcel.mainAreaM2 ?? 0), 0) ?? 0;
@@ -360,6 +387,15 @@ function buildLocalAdminData(
 }
 
 type AppView = "input" | "chat" | "admin";
+
+function viewLabel(view: AppView) {
+  const labels: Record<AppView, string> = {
+    input: "申請入力",
+    chat: "チャット申請",
+    admin: "管理",
+  };
+  return labels[view];
+}
 
 function ViewSwitcher({ view, canUseAdmin, onChange }: { view: AppView; canUseAdmin: boolean; onChange: (view: AppView) => void }) {
   return (

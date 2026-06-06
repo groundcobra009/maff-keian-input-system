@@ -135,6 +135,24 @@ export function buildDemoAdminData(count = 30): AdminDashboardData {
         addedBy: "demo",
       },
     ],
+    feedbackItems: [
+      {
+        id: "demo-feedback-1",
+        name: "農林 太郎",
+        message: "住所を途中まで入れたときに、番地まで必要だと分かる案内があると助かります。",
+        view: "チャット申請",
+        status: "new",
+        createdAt: baseTime - 1000 * 60 * 18,
+      },
+      {
+        id: "demo-feedback-2",
+        name: "再生協 担当者",
+        message: "管理画面で補助金ごとの件数が見えるのはよいので、今後はCSV出力前の未確認件数も見たいです。",
+        view: "管理",
+        status: "new",
+        createdAt: baseTime - 1000 * 60 * 74,
+      },
+    ],
     applications,
     recentAuditLogs: applications.slice(0, 12).map((application, index) => ({
       id: `demo-audit-${index + 1}`,

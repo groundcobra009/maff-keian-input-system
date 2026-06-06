@@ -36,6 +36,13 @@ export const convexApi = {
   export: {
     generateCsv: makeFunctionReference<"action", { applicationId: string }, { fileName: string; content: string }>("export:generateCsv"),
   },
+  feedback: {
+    submit: makeFunctionReference<
+      "mutation",
+      { name: string; message: string; email?: string; view?: string; createdBy?: string },
+      string
+    >("feedback:submit"),
+  },
   admin: {
     dashboard: makeFunctionReference<"query", Record<string, never>, any>("admin:dashboard"),
     setApplicationStatus: makeFunctionReference<

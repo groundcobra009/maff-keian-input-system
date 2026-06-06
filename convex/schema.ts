@@ -26,6 +26,18 @@ export default defineSchema({
     addedBy: v.optional(v.string()),
   }).index("by_email", ["email"]),
 
+  feedbackItems: defineTable({
+    name: v.string(),
+    email: v.optional(v.string()),
+    message: v.string(),
+    view: v.optional(v.string()),
+    status: v.union(v.literal("new"), v.literal("reviewing"), v.literal("done"), v.literal("archived")),
+    createdAt: v.number(),
+    createdBy: v.optional(v.string()),
+  })
+    .index("by_status_created", ["status", "createdAt"])
+    .index("by_created", ["createdAt"]),
+
   applicants: defineTable({
     organizationId: v.optional(v.id("organizations")),
     managementCode: v.string(),

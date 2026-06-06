@@ -1,4 +1,4 @@
-import { Activity, AlertCircle, Building2, Clock3, Database, FileCheck2, FileDown, ListChecks, Mail, Search, ShieldCheck, ScanText, Trash2, UserPlus } from "lucide-react";
+import { Activity, AlertCircle, Building2, Clock3, Database, FileCheck2, FileDown, ListChecks, Mail, MessageSquareText, Search, ShieldCheck, ScanText, Trash2, UserPlus } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { fieldGroups, statusLabels } from "../data/formDefinition";
@@ -99,6 +99,7 @@ export function AdminDashboard({
     .sort((a, b) => b.errorCount - a.errorCount || b.warningCount - a.warningCount || b.updatedAt - a.updatedAt)
     .slice(0, 5);
   const adminUsers = data.adminUsers ?? [];
+  const feedbackItems = data.feedbackItems ?? [];
   const updateSetting = (key: keyof CouncilSettings, value: string) => {
     setSettingsDraft((current) => ({ ...current, [key]: value }));
   };
@@ -383,6 +384,38 @@ export function AdminDashboard({
                 )}
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="admin-section">
+          <div className="admin-section-heading">
+            <div>
+              <h2>テスト意見</h2>
+              <p>テスト利用者から届いた改修要望や気づきを確認できます。</p>
+            </div>
+            <span className="mode-pill convex">
+              <MessageSquareText size={14} />
+              {feedbackItems.length}件
+            </span>
+          </div>
+          <div className="feedback-list">
+            {feedbackItems.length ? (
+              feedbackItems.map((feedback) => (
+                <article key={feedback.id} className="feedback-item">
+                  <header>
+                    <div>
+                      <strong>{feedback.name}</strong>
+                      <span>{feedback.view ?? "画面未指定"}</span>
+                    </div>
+                    <time>{formatTime(feedback.createdAt)}</time>
+                  </header>
+                  <p>{feedback.message}</p>
+                  {feedback.email || feedback.createdBy ? <small>{feedback.email ?? feedback.createdBy}</small> : null}
+                </article>
+              ))
+            ) : (
+              <p className="subtle">まだ改修要望は届いていません。</p>
+            )}
           </div>
         </section>
 
